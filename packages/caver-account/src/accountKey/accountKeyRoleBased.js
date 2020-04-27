@@ -24,7 +24,7 @@ const AccountKeyPublic = require('./accountKeyPublic')
 const AccountKeyFail = require('./accountKeyFail')
 const utils = require('../../../caver-utils')
 const { ACCOUNT_KEY_TAG } = require('./accountKeyHelper')
-const { KEY_ROLE } = require('../../../caver-keyring/src/keyringHelper/keyringHelper')
+const { KEY_ROLE } = require('../../../caver-wallet/src/keyring/keyringHelper')
 
 function isValidRoleBasedKeyFormat(roleBasedAccountKeys) {
     if (!_.isArray(roleBasedAccountKeys)) return false
@@ -131,8 +131,7 @@ class AccountKeyRoleBased {
      * @param {Array.<AccountKeyLegacy|AccountKeyPublic|AccountKeyFail|AccountKeyWeightedMultiSig>} accountKeyArray - An array containing arrays of instances of AccountKeyPublic or AccountKeyWeightedMultiSig for each role.
      */
     constructor(accountKeyArray) {
-        if (!isValidRoleBasedKeyFormat(accountKeyArray)) throw new Error(`Invalid role-based account key format.`)
-        this._accountKeys = accountKeyArray
+        this.accountKeys = accountKeyArray
     }
 
     /**
@@ -142,7 +141,7 @@ class AccountKeyRoleBased {
         return this._accountKeys
     }
 
-    set accountkeys(keys) {
+    set accountKeys(keys) {
         if (!isValidRoleBasedKeyFormat(keys)) throw new Error(`Invalid role-based account key format.`)
         this._accountKeys = keys
     }
