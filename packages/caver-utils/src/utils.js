@@ -700,7 +700,10 @@ const rlpEncode = data => RLP.encode(data)
 
 const rlpDecode = encodedData => RLP.decode(encodedData)
 
-const xyPointFromPublicKey = publicKey => {
+const xyPointFromPublicKey = pub => {
+    let publicKey = pub
+    if (isCompressedPublicKey(publicKey)) publicKey = decompressPublicKey(pub)
+
     publicKey = publicKey.replace('0x', '')
     if (publicKey.length !== 128) throw Error('Invalid public key') // + 2 means '0x'
 
@@ -723,6 +726,12 @@ const makeEven = function(hex) {
     return hex
 }
 
+/**
+ * Returns an array of signatures.
+ *
+ * @param {string|object|Array.<string>} signature The address entered by the user for use in creating an account.
+ * @return {Array.<string>} the sha3 string
+ */
 const resolveSignature = signature => {
     if (_.isArray(signature)) {
         const [v, r, s] = signature
@@ -730,7 +739,9 @@ const resolveSignature = signature => {
     }
 
     if (_.isObject(signature)) {
-        const { v, r, s } = signature
+        const v = signature.V || signature.v
+        const r = signature.R || signature.r
+        const s = signature.S || signature.s
         if (!v || !r || !s) throw new Error('v, r, s fields should exist in signature')
 
         return [v, r, s]

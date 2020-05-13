@@ -1154,6 +1154,30 @@ describe('caver.utils.xyPointFromPublicKey', () => {
         expect(xyPoint4[0]).to.equals('0x5b3b58259770871a1cc18534f2d438935fa2dcdb04116cbfbde8adfe858c23e')
         expect(xyPoint4[1]).to.equals('0x50047c5aea3c2f55de7de04203f8fe8ccc3b491029338d038a7ef6d6903b302e')
     })
+
+    it('CAVERJS-UNIT-ETC-209: caver.utils.xyPointFromPublicKey should return x, y point with compressed public key', () => {
+        const publicKey1 = '0x03046241c7524030e5b44fff78021e35227d708c8630757b35090d56527b615f60'
+        const publicKey2 = '0x02ba7135b75cae89b958e7bb78009bda52f6a348150757cc078e3e5e5d25519c50'
+        const publicKey3 = '0x0212b97e6756861ac0257a240d985d761cee9ca7719a29c233c644cfcc42188500'
+        const publicKey4 = '0x0205b3b58259770871a1cc18534f2d438935fa2dcdb04116cbfbde8adfe858c23e'
+
+        const xyPoint1 = caver.utils.xyPointFromPublicKey(publicKey1)
+        const xyPoint2 = caver.utils.xyPointFromPublicKey(publicKey2)
+        const xyPoint3 = caver.utils.xyPointFromPublicKey(publicKey3)
+        const xyPoint4 = caver.utils.xyPointFromPublicKey(publicKey4)
+
+        expect(xyPoint1[0]).to.equals('0x46241c7524030e5b44fff78021e35227d708c8630757b35090d56527b615f60')
+        expect(xyPoint1[1]).to.equals('0x5b8d366782c86dee49356be574e1172f75ef5ce5d03b6e8c17dbf10f3fa2d9a3')
+
+        expect(xyPoint2[0]).to.equals('0xba7135b75cae89b958e7bb78009bda52f6a348150757cc078e3e5e5d25519c50')
+        expect(xyPoint2[1]).to.equals('0xed4ccec1f78ba4e1c21c7b1e57751cec4cf42e3997a476e3ecbf360ad095336')
+
+        expect(xyPoint3[0]).to.equals('0x12b97e6756861ac0257a240d985d761cee9ca7719a29c233c644cfcc42188500')
+        expect(xyPoint3[1]).to.equals('0xc8e4c69cdb71665377b9e8ffb702355ca53917e66c7444619049c3dd0252ab6')
+
+        expect(xyPoint4[0]).to.equals('0x5b3b58259770871a1cc18534f2d438935fa2dcdb04116cbfbde8adfe858c23e')
+        expect(xyPoint4[1]).to.equals('0x50047c5aea3c2f55de7de04203f8fe8ccc3b491029338d038a7ef6d6903b302e')
+    })
 })
 
 describe('caver.utils.isValidPublicKey', () => {
@@ -1588,5 +1612,69 @@ describe('caver.utils.parsePrivateKey', () => {
         const expectedError = 'Invalid KlaytnWalletKey format.'
 
         expect(() => caver.utils.parsePrivateKey(key)).to.throws(expectedError)
+    })
+})
+
+describe('caver.utils.resolveSignature', () => {
+    it('CAVERJS-UNIT-ETC-211: should return an array of signature from object(lowercase)', () => {
+        const signature = {
+            v: '0x0fe9',
+            r: '0x02aca4ec6773a26c71340c2500cb45886a61797bcd82790f7f01150ced48b0ac',
+            s: '0x20502f22a1b3c95a5f260a03dc3de0eaa1f4a618b1d2a7d4da643507302e523c',
+        }
+
+        const resolved = caver.utils.resolveSignature(signature)
+
+        expect(resolved.length).to.be.equals(3)
+        expect(resolved[0]).to.be.equals(signature.v)
+        expect(resolved[1]).to.be.equals(signature.r)
+        expect(resolved[2]).to.be.equals(signature.s)
+    })
+
+    it('CAVERJS-UNIT-ETC-212: should return an array of signature from object(uppercase)', () => {
+        const signature = {
+            V: '0x0fe9',
+            R: '0x02aca4ec6773a26c71340c2500cb45886a61797bcd82790f7f01150ced48b0ac',
+            S: '0x20502f22a1b3c95a5f260a03dc3de0eaa1f4a618b1d2a7d4da643507302e523c',
+        }
+
+        const resolved = caver.utils.resolveSignature(signature)
+
+        expect(resolved.length).to.be.equals(3)
+        expect(resolved[0]).to.be.equals(signature.V)
+        expect(resolved[1]).to.be.equals(signature.R)
+        expect(resolved[2]).to.be.equals(signature.S)
+    })
+
+    it('CAVERJS-UNIT-ETC-213: should return an array of signature', () => {
+        const signature = [
+            '0x0fe9',
+            '0x02aca4ec6773a26c71340c2500cb45886a61797bcd82790f7f01150ced48b0ac',
+            '0x20502f22a1b3c95a5f260a03dc3de0eaa1f4a618b1d2a7d4da643507302e523c',
+        ]
+
+        const resolved = caver.utils.resolveSignature(signature)
+
+        expect(resolved.length).to.be.equals(3)
+        expect(resolved[0]).to.be.equals(signature[0])
+        expect(resolved[1]).to.be.equals(signature[1])
+        expect(resolved[2]).to.be.equals(signature[2])
+    })
+
+    it('CAVERJS-UNIT-ETC-214: should return an array of signature from encoded signature', () => {
+        const signature =
+            '0x7e85aaff6a6ef0730308af49f6b512741e61f958a21df387a0d0e8973fb40ca0307a8b87f6ac249f7218b4ee1a1d2f7d764ec2d20d9824e7b7b842dd214f139c7f6'
+        const expected = [
+            '0x7f6',
+            '0x7e85aaff6a6ef0730308af49f6b512741e61f958a21df387a0d0e8973fb40ca0',
+            '0x307a8b87f6ac249f7218b4ee1a1d2f7d764ec2d20d9824e7b7b842dd214f139c',
+        ]
+
+        const resolved = caver.utils.resolveSignature(signature)
+
+        expect(resolved.length).to.be.equals(3)
+        expect(resolved[0]).to.be.equals(expected[0])
+        expect(resolved[1]).to.be.equals(expected[1])
+        expect(resolved[2]).to.be.equals(expected[2])
     })
 })
