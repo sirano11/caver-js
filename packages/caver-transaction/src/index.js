@@ -16,39 +16,15 @@
     along with the caver-js. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const _ = require('lodash')
-
-const KEY_ROLE = {
-    RoleTransactionKey: 0,
-    0: 'RoleTransactionKey',
-    RoleAccountUpdateKey: 1,
-    1: 'RoleAccountUpdateKey',
-    RoleFeePayerKey: 2,
-    2: 'RoleFeePayerKey',
-    RoleLast: 3,
-}
-
-const MAXIMUM_KEY_NUM = 10
-
-const isMultipleKeysFormat = keys => {
-    if (!_.isArray(keys)) return false
-    return keys.every(key => {
-        return _.isString(key)
-    })
-}
-
-const isRoleBasedKeysFormat = roledBasedKeyArray => {
-    if (!_.isArray(roledBasedKeyArray)) return false
-    if (roledBasedKeyArray.length > KEY_ROLE.RoleLast) return false
-
-    return roledBasedKeyArray.every(arr => {
-        return _.isArray(arr)
-    })
-}
+const LegacyTransaction = require('./transactionTypes/legacyTransaction/legacyTransaction')
+const TransactionDecoder = require('./transactionDecoder/transactionDecoder')
+const { TX_TYPE_STRING, TX_TYPE_TAG } = require('./transactionHelper/transactionHelper')
 
 module.exports = {
-    KEY_ROLE,
-    MAXIMUM_KEY_NUM,
-    isMultipleKeysFormat,
-    isRoleBasedKeysFormat,
+    decode: TransactionDecoder.decode,
+
+    legacyTransaction: LegacyTransaction,
+
+    type: TX_TYPE_STRING,
+    tag: TX_TYPE_TAG,
 }

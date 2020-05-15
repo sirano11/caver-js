@@ -16,18 +16,27 @@
     along with the caver-js. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const Hash = require('eth-lib/lib/hash')
+const { TX_TYPE_STRING, typeDetectionFromRLPEncoding } = require('../transactionHelper/transactionHelper')
+const LegacyTransaction = require('../transactionTypes/legacyTransaction/legacyTransaction')
 
-class TransactionHasher {
-    static getHashForSignature(transaction) {
-        const rlpEncoded = transaction.getRLPEncodingForSignature()
-        return Hash.keccak256(rlpEncoded)
-    }
+/**
+ * Representing a transaction decoder.
+ * @class
+ */
+class TransactionDecoder {
+    /**
+     * Decodes RLP-encoded transaction string and returns a Transaction instance.
+     * @param {string} rlpEncoded - An RLP-encoded transaction string to decode.
+     * @return {Transaction}
+     */
+    static decode(rlpEncoded) {
+        const type = typeDetectionFromRLPEncoding(rlpEncoded)
 
-    static getHashForFeePayerSignature(transaction) {
-        const rlpEncoded = transaction.getRLPEncodingForFeePayerSignature()
-        return Hash.keccak256(rlpEncoded)
+        switch (type) {
+            case TX_TYPE_STRING.TxTypeLegacyTransaction:
+                return LegacyTransaction.decode(rlpEncoded)
+        }
     }
 }
 
-module.exports = TransactionHasher
+module.exports = TransactionDecoder

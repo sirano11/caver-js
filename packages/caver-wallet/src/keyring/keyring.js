@@ -26,7 +26,10 @@ const utils = require('../../../caver-utils')
 const PrivateKey = require('./privateKey')
 const { KEY_ROLE, MAXIMUM_KEY_NUM, isMultipleKeysFormat, isRoleBasedKeysFormat } = require('./keyringHelper')
 const Account = require('../../../caver-account')
-const WeightedMultiSigOptions = require('../../../caver-account/src/accountKey/weightedMultiSigOptions')
+const {
+    fillWeightedMultiSigOptionsForMultiSig,
+    fillWeightedMultiSigOptionsForRoleBased,
+} = require('../../../caver-account/src/accountKey/accountKeyHelper')
 
 /**
  * representing a Keyring which includes `address` and `private keys` by roles.
@@ -237,13 +240,13 @@ class Keyring {
 
         // AccountKeyRoleBased format
         if (_.isArray(json.keyring[0])) {
-            const transactionKey = decryptKey(json.keyring[KEY_ROLE.ROLE_TRANSACTION_KEY], password)
+            const transactionKey = decryptKey(json.keyring[KEY_ROLE.RoleTransactionKey], password)
             transactionKey ? keys.push(transactionKey) : keys.push([])
 
-            const updateKey = decryptKey(json.keyring[KEY_ROLE.ROLE_ACCOUNT_UPDATE_KEY], password)
+            const updateKey = decryptKey(json.keyring[KEY_ROLE.RoleAccountUpdateKey], password)
             updateKey ? keys.push(updateKey) : keys.push([])
 
-            const feePayerKey = decryptKey(json.keyring[KEY_ROLE.ROLE_FEE_PAYER_KEY], password)
+            const feePayerKey = decryptKey(json.keyring[KEY_ROLE.RoleFeePayerKey], password)
             feePayerKey ? keys.push(feePayerKey) : keys.push([])
         } else {
             let decrypted = decryptKey(json.keyring, password)
@@ -251,7 +254,7 @@ class Keyring {
             keys.push(decrypted)
 
             // Make format like "[[keys], [], []]"
-            for (let i = 0; i < KEY_ROLE.ROLE_LAST - decrypted.length; i++) {
+            for (let i = 0; i < KEY_ROLE.RoleLast - decrypted.length; i++) {
                 keys.push([])
             }
         }
@@ -306,21 +309,21 @@ class Keyring {
      * @type {Array.<PrivateKey>}
      */
     get roleTransactionKey() {
-        return this.getKeyByRole(KEY_ROLE.ROLE_TRANSACTION_KEY)
+        return this.getKeyByRole(KEY_ROLE.RoleTransactionKey)
     }
 
     /**
      * @type {Array.<PrivateKey>}
      */
     get roleAccountUpdateKey() {
-        return this.getKeyByRole(KEY_ROLE.ROLE_ACCOUNT_UPDATE_KEY)
+        return this.getKeyByRole(KEY_ROLE.RoleAccountUpdateKey)
     }
 
     /**
      * @type {Array.<PrivateKey>}
      */
     get roleFeePayerKey() {
-        return this.getKeyByRole(KEY_ROLE.ROLE_FEE_PAYER_KEY)
+        return this.getKeyByRole(KEY_ROLE.RoleFeePayerKey)
     }
 
     /**
@@ -341,7 +344,7 @@ class Keyring {
      */
     getPublicKey() {
         const publicKeys = generateKeysFormat()
-        for (let i = 0; i < KEY_ROLE.ROLE_LAST; i++) {
+        for (let i = 0; i < KEY_ROLE.RoleLast; i++) {
             for (const k of this._keys[i]) {
                 publicKeys[i].push(k.getPublicKey())
             }
@@ -415,14 +418,14 @@ class Keyring {
      * signs with hashed data and returns result object that includes `signature`, `message` and `messageHash`
      *
      * @param {string} data The data string to sign.
-     * @param {number} [role] A number indicating the role of the key. You can use `caver.wallet.keyring.role`. (default: `caver.wallet.keyring.role.ROLE_TRANSACTION_KEY`)
+     * @param {number} [role] A number indicating the role of the key. You can use `caver.wallet.keyring.role`. (default: `caver.wallet.keyring.role.RoleTransactionKey`)
      * @param {number} [index] The index of the key to be used. (default: 0)
      * @return {object}
      */
     signMessage(message, role, index) {
         const messageHash = utils.hashMessage(message)
         if (role === undefined && index === undefined) {
-            role = KEY_ROLE.ROLE_TRANSACTION_KEY
+            role = KEY_ROLE.RoleTransactionKey
             if (this._keys[role].length === 0) throw new Error(`Default key(${KEY_ROLE[0]}) does not have enough keys to sign.`)
             index = 0
         } else if (role === undefined || index === undefined) {
@@ -452,14 +455,14 @@ class Keyring {
     getKeyByRole(role) {
         if (role === undefined) throw new Error(`role should be defined.`)
         let key = this._keys[role]
-        if (key.length === 0 && role > KEY_ROLE.ROLE_TRANSACTION_KEY) {
-            if (this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY].length === 0) {
+        if (key.length === 0 && role > KEY_ROLE.RoleTransactionKey) {
+            if (this._keys[KEY_ROLE.RoleTransactionKey].length === 0) {
                 throw new Error(
                     `The key with ${KEY_ROLE[role]} role does not exist. The ${KEY_ROLE[0]} for the default role is also empty.`
                 )
             }
 
-            key = this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY]
+            key = this._keys[KEY_ROLE.RoleTransactionKey]
         }
         return key
     }
@@ -471,9 +474,9 @@ class Keyring {
      */
     getKlaytnWalletKey() {
         const notAvailableError = `The keyring cannot be exported in KlaytnWalletKey format. Use caver.wallet.keyring.encrypt or keyring.encrypt.`
-        if (this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY].length > 1) throw new Error(notAvailableError)
+        if (this._keys[KEY_ROLE.RoleTransactionKey].length > 1) throw new Error(notAvailableError)
 
-        for (let i = KEY_ROLE.ROLE_ACCOUNT_UPDATE_KEY; i < KEY_ROLE.ROLE_LAST; i++) {
+        for (let i = KEY_ROLE.RoleAccountUpdateKey; i < KEY_ROLE.RoleLast; i++) {
             if (this._keys[i].length > 0) {
                 throw new Error(notAvailableError)
             }
@@ -499,7 +502,7 @@ class Keyring {
         if (isEmptyKey(this._keys)) throw new Error(`Failed to create Account instance: Empty key in keyring.`)
 
         // Determine AccountKeyRoleBased or not.
-        for (let i = KEY_ROLE.ROLE_LAST - 1; i > KEY_ROLE.ROLE_TRANSACTION_KEY; i--) {
+        for (let i = KEY_ROLE.RoleLast - 1; i > KEY_ROLE.RoleTransactionKey; i--) {
             if (this._keys[i].length > 0) {
                 isRoleBased = true
                 break
@@ -508,12 +511,12 @@ class Keyring {
 
         // Determine AccountKeyWeightedMultiSig or not.
         if (!isRoleBased) {
-            if (this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY].length === 1 && options !== undefined) {
+            if (this._keys[KEY_ROLE.RoleTransactionKey].length === 1 && options !== undefined) {
                 if (_.isArray(options) && options.length > 0) options = options[0]
                 // if private key length is 1, handled as an AccountKeyWeightedMultiSig only when valid options is defined.
                 if (options.threshold !== undefined && options.weights !== undefined) isWeightedMultiSig = true
             }
-            if (this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY].length > 1) {
+            if (this._keys[KEY_ROLE.RoleTransactionKey].length > 1) {
                 isWeightedMultiSig = true
             }
         }
@@ -521,8 +524,12 @@ class Keyring {
         if (isRoleBased && options !== undefined && !_.isArray(options))
             throw new Error(`options for an account should define threshold and weight for each roles in an array format`)
 
-        // _validateOptionsForUpdate returns WeightedMultiSigOptions with 1 threshold and 1 weight for each key when options is not defined.
-        if (isRoleBased || isWeightedMultiSig) options = this._validateOptionsForUpdate(options)
+        if (isRoleBased) {
+            const lengths = []
+            for (const k of this.keys) lengths.push(k.length)
+            options = fillWeightedMultiSigOptionsForRoleBased(lengths, options)
+        }
+        if (isWeightedMultiSig) options = fillWeightedMultiSigOptionsForMultiSig(this.keys[0].length, options)
 
         if (isRoleBased) {
             // AccountKeyRoleBased with AccountKeyPublic
@@ -533,9 +540,6 @@ class Keyring {
             return Account.createWithAccountKeyRoleBased(this.address, publicKeysByRole, options)
         }
         if (isWeightedMultiSig) {
-            // options = [ {threshold: 1, weights: [1,2] }, {}, {} ]
-            options = options[0]
-
             const publicKeys = this.getPublicKey()[0]
             return Account.createWithAccountKeyWeightedMultiSig(this.address, publicKeys, options)
         }
@@ -572,9 +576,9 @@ class Keyring {
         let keyring = []
         let isRoleBased = false
 
-        for (let i = KEY_ROLE.ROLE_TRANSACTION_KEY; i < KEY_ROLE.ROLE_LAST; i++) {
+        for (let i = KEY_ROLE.RoleTransactionKey; i < KEY_ROLE.RoleLast; i++) {
             const roledKey = this._keys[i]
-            if (i > KEY_ROLE.ROLE_TRANSACTION_KEY && roledKey.length > 0) isRoleBased = true
+            if (i > KEY_ROLE.RoleTransactionKey && roledKey.length > 0) isRoleBased = true
             keyring.push(encryptKey(roledKey, password, options))
         }
 
@@ -592,9 +596,9 @@ class Keyring {
      */
     encryptV3(password, options) {
         const notAvailableError = `This keyring cannot be encrypted keystore v3. use 'keyring.encrypt(password)'.`
-        if (this._keys[KEY_ROLE.ROLE_TRANSACTION_KEY].length > 1) throw new Error(notAvailableError)
+        if (this._keys[KEY_ROLE.RoleTransactionKey].length > 1) throw new Error(notAvailableError)
 
-        for (let i = KEY_ROLE.ROLE_ACCOUNT_UPDATE_KEY; i < KEY_ROLE.ROLE_LAST; i++) {
+        for (let i = KEY_ROLE.RoleAccountUpdateKey; i < KEY_ROLE.RoleLast; i++) {
             if (this._keys[i].length > 0) {
                 throw new Error(notAvailableError)
             }
@@ -620,36 +624,6 @@ class Keyring {
 
         const derived = this.keys[0][0].getDerivedAddress()
         return this.address.toLowerCase() !== derived.toLowerCase()
-    }
-
-    _validateOptionsForUpdate(options = []) {
-        // { threshold: 1, weights: [1, 1] } => [{ threshold: 1, weights: [1, 1] }]
-        if (!_.isArray(options)) options = [options]
-
-        for (let i = 0; i < this._keys.length; i++) {
-            // Validation for options obejct will be operated in AccountKeyWeightedMultiSig class.
-            if (options[i] && Object.keys(options[i]).length > 0) {
-                if (!(options[i] instanceof WeightedMultiSigOptions))
-                    options[i] = new WeightedMultiSigOptions(options[i].threshold, options[i].weights)
-                if (!options[i].isEmpty()) continue
-            }
-
-            let optionToAdd
-            if (this._keys[i].length > 1) {
-                // default option when option is not set
-                optionToAdd = new WeightedMultiSigOptions(1, Array(this._keys[i].length).fill(1))
-            } else {
-                // AccountKeyPublic does not need option
-                optionToAdd = new WeightedMultiSigOptions()
-            }
-
-            if (options[i]) {
-                options[i] = optionToAdd
-            } else {
-                options.push(optionToAdd)
-            }
-        }
-        return options
     }
 }
 
@@ -687,7 +661,7 @@ function formattingForKeyInKeyring(keyInput) {
     }
 
     const keys = generateKeysFormat()
-    for (let i = 0; i < KEY_ROLE.ROLE_LAST; i++) {
+    for (let i = 0; i < KEY_ROLE.RoleLast; i++) {
         fillRoleKey(keys, i, keyInput[i])
     }
 
@@ -695,7 +669,7 @@ function formattingForKeyInKeyring(keyInput) {
 }
 
 function generateKeysFormat() {
-    return Array(KEY_ROLE.ROLE_LAST)
+    return Array(KEY_ROLE.RoleLast)
         .fill(null)
         .map(() => [])
 }
@@ -715,9 +689,9 @@ function fillRoleKey(keys, role, keyToAdd) {
 
     if (keyToAdd.length > MAXIMUM_KEY_NUM)
         throw new Error(`The maximum number of private keys that can be used in keyring is ${MAXIMUM_KEY_NUM}.`)
-    if (role >= KEY_ROLE.ROLE_LAST)
+    if (role >= KEY_ROLE.RoleLast)
         throw new Error(
-            `Unsupported role number. The role number should be less than ${KEY_ROLE.ROLE_LAST}. Please use 'caver.wallet.keyring.role'`
+            `Unsupported role number. The role number should be less than ${KEY_ROLE.RoleLast}. Please use 'caver.wallet.keyring.role'`
         )
 
     for (const keyString of keyToAdd) {
