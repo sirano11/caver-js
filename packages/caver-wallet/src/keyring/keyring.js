@@ -170,14 +170,15 @@ class Keyring {
         } else if (_.isString(key)) {
             if (options.address) {
                 if (utils.isKlaytnWalletKey(key)) {
-                    const fromKlaytnWalletKey = Keyring.createFromKlaytnWalletKey(key)
-                    if (fromKlaytnWalletKey.address.toLowerCase() !== options.address.toLowerCase()) {
+                    keyring = Keyring.createFromKlaytnWalletKey(key)
+                    if (keyring.address.toLowerCase() !== options.address.toLowerCase()) {
                         throw new Error(
-                            `The address defined in options(${options.address}) does not match the address of KlaytnWalletKey(${fromKlaytnWalletKey.address}) entered as a parameter.`
+                            `The address defined in options(${options.address}) does not match the address of KlaytnWalletKey(${keyring.address}) entered as a parameter.`
                         )
                     }
+                } else {
+                    keyring = Keyring.createWithSingleKey(options.address, key)
                 }
-                keyring = Keyring.createWithSingleKey(options.address, key)
             } else {
                 keyring = Keyring.createFromPrivateKey(key)
             }
@@ -201,12 +202,23 @@ class Keyring {
             throw new Error(`Invalid parameter. key should be a private key string, KlaytnWalletKey or instance of Keyring`)
         }
 
-        const keyring =
-            key instanceof Keyring
-                ? key
-                : options.address
-                ? Keyring.createWithSingleKey(options.address, key)
-                : Keyring.createFromPrivateKey(key)
+        let keyring
+        if (key instanceof Keyring) {
+            keyring = key
+        } else if (options.address) {
+            if (utils.isKlaytnWalletKey(key)) {
+                keyring = Keyring.createFromKlaytnWalletKey(key)
+                if (keyring.address.toLowerCase() !== options.address.toLowerCase()) {
+                    throw new Error(
+                        `The address defined in options(${options.address}) does not match the address of KlaytnWalletKey(${keyring.address}) entered as a parameter.`
+                    )
+                }
+            } else {
+                keyring = Keyring.createWithSingleKey(options.address, key)
+            }
+        } else {
+            keyring = Keyring.createFromPrivateKey(key)
+        }
 
         return keyring.encryptV3(password, options)
     }
@@ -268,7 +280,7 @@ class Keyring {
      * @param {string|object} message A signed message string, a hash or an object that includes signed message string to recover.
      * @param {Array.<string>} signature v, r, s values.
      * @param {boolean} preFixed If the last parameter is true, the given message will NOT automatically be prefixed with "\x19Klaytn Signed Message:\n" + message.length + message, and assumed to be already prefixed.
-     * @return {Keyring}
+     * @return {string}
      */
     static recover(message, signature, preFixed = false) {
         if (_.isObject(message)) {

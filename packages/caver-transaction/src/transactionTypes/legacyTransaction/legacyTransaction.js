@@ -25,7 +25,7 @@ const utils = require('../../../../caver-utils/src')
 
 /**
  * Represents a legacy transaction.
- * Please refer https://docs.klaytn.com/klaytn/design/transactions/basic#txtypelegacytransaction to see more detail.
+ * Please refer to https://docs.klaytn.com/klaytn/design/transactions/basic#txtypelegacytransaction to see more detail.
  * @class
  */
 class LegacyTransaction extends AbstractTransaction {
@@ -45,8 +45,9 @@ class LegacyTransaction extends AbstractTransaction {
     /**
      * Creates a legacy transaction.
      * @constructor
-     * @param {object} createTxObj - The parameters to create a LegacyTransaction transaction.
-     *                               The createTxObj can define `from`, `to`, `value`, `input`, `nonce`, `gas`, `gasPrice`, `feeRatio`, `signatures`, `feePayer`, `feePayerSignatures` and `chainId`.
+     * @param {object|string} createTxObj - The parameters to create a LegacyTransaction transaction. This can be an object defining transaction information, or it can be an RLP-encoded string.
+     *                                      If it is an RLP-encoded string, decode it to create a transaction instance.
+     *                               The object can define `from`, `to`, `value`, `input`, `nonce`, `gas`, `gasPrice`, `feeRatio`, `signatures`, `feePayer`, `feePayerSignatures` and `chainId`.
      */
     constructor(createTxObj) {
         if (_.isString(createTxObj)) createTxObj = LegacyTransaction.decode(createTxObj)
@@ -105,7 +106,7 @@ class LegacyTransaction extends AbstractTransaction {
 
     set input(input) {
         if (!input || !utils.isHex(input)) throw new Error(`Invalid input data ${input}`)
-        this._input = utils.toHex(input)
+        this._input = utils.addHexPrefix(input)
     }
 
     /**
@@ -141,7 +142,7 @@ class LegacyTransaction extends AbstractTransaction {
     }
 
     /**
-     * Returns RLP-encoded transaction string(rawTransaction).
+     * Returns the RLP-encoded string of this transaction (i.e., rawTransaction).
      * @return {string}
      */
     getRLPEncoding() {
@@ -151,7 +152,7 @@ class LegacyTransaction extends AbstractTransaction {
             Bytes.fromNat(this.nonce),
             Bytes.fromNat(this.gasPrice),
             Bytes.fromNat(this.gas),
-            this.to,
+            this.to.toLowerCase(),
             Bytes.fromNat(this.value),
             this.input,
             this.signatures[0],
@@ -161,7 +162,7 @@ class LegacyTransaction extends AbstractTransaction {
     }
 
     /**
-     * Returns RLP-encoded transaction string for making signature
+     * Returns RLP-encoded string for making signature
      * @override
      * @return {string}
      */
@@ -172,7 +173,7 @@ class LegacyTransaction extends AbstractTransaction {
             Bytes.fromNat(this.nonce),
             Bytes.fromNat(this.gasPrice),
             Bytes.fromNat(this.gas),
-            this.to,
+            this.to.toLowerCase(),
             Bytes.fromNat(this.value),
             this.input,
             Bytes.fromNat(this.chainId || '0x1'),

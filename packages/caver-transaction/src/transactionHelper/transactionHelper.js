@@ -98,14 +98,25 @@ const TX_TYPE_TAG = {
     '0x3a': TX_TYPE_STRING.TxTypeFeeDelegatedCancelWithRatio,
 
     TxTypeChainDataAnchoring: '0x48',
-    '0x49': TX_TYPE_STRING.TxTypeChainDataAnchoring,
-    TxTypeFeeDelegatedChainDataAnchoring: 'TxTypeFeeDelegatedChainDataAnchoring',
-    '0x4a': TX_TYPE_STRING.TxTypeChainDataAnchoring,
-    TxTypeFeeDelegatedChainDataAnchoringWithRatio: 'TxTypeFeeDelegatedChainDataAnchoringWithRatio',
+    '0x48': TX_TYPE_STRING.TxTypeChainDataAnchoring,
+    TxTypeFeeDelegatedChainDataAnchoring: '0x49',
+    '0x49': TX_TYPE_STRING.TxTypeFeeDelegatedChainDataAnchoring,
+    TxTypeFeeDelegatedChainDataAnchoringWithRatio: '0x4a',
+    '0x4a': TX_TYPE_STRING.TxTypeFeeDelegatedChainDataAnchoringWithRatio,
 }
 
 const CODE_FORMAT = {
     EVM: '0x0',
+}
+
+/**
+ * Returns transaction type number.
+ *
+ * @param {string} type - A transaction type string.
+ * @return {number}
+ */
+const getTypeInt = type => {
+    return utils.hexToNumber(TX_TYPE_TAG[type])
 }
 
 /**
@@ -128,7 +139,7 @@ const refineSignatures = (sigArray, isLegacy = false) => {
             const sigString = sig.join('')
             if (!set.has(sigString)) {
                 set.add(sigString, true)
-                result.push(sig)
+                result.push(sig.map(vrs => utils.makeEven(vrs)))
             }
         }
     }
@@ -176,4 +187,5 @@ module.exports = {
     refineSignatures,
     typeDetectionFromRLPEncoding,
     getCodeFormatTag,
+    getTypeInt,
 }
