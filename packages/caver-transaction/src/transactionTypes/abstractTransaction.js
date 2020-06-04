@@ -48,6 +48,8 @@ class AbstractTransaction {
         const err = validateParams(createTxObj)
         if (err) throw err
 
+        this.from = createTxObj.from
+
         this.gas = createTxObj.gas
 
         // The variables below are values that the user does not need to pass to the parameter.
@@ -63,6 +65,22 @@ class AbstractTransaction {
      */
     get type() {
         return this._type
+    }
+
+    /**
+     * @type {string}
+     */
+    get from() {
+        return this._from
+    }
+
+    set from(address) {
+        if (this.type === TX_TYPE_STRING.TxTypeLegacyTransaction && address === '0x') {
+            this._from = address.toLowerCase()
+        } else {
+            if (!utils.isAddress(address)) throw new Error(`Invalid address ${address}`)
+            this._from = address.toLowerCase()
+        }
     }
 
     /**
@@ -290,6 +308,18 @@ class AbstractTransaction {
         this.validateOptionalValues()
 
         return RLP.encode([this.getCommonRLPEncodingForSignature(), Bytes.fromNat(this.chainId || '0x1'), '0x', '0x'])
+    }
+
+    /**
+     * Returns the RLP-encoded string to make the signature of this transaction.
+     * This method has to be overrided in classes which extends AbstractTransaction.
+     * getCommonRLPEncodingForSignature is used in getRLPEncodingForSignature.
+     *
+     * @return {string}
+     */
+    // eslint-disable-next-line class-methods-use-this
+    getCommonRLPEncodingForSignature() {
+        throw new Error('getCommonRLPEncodingForSignature has to be implemented')
     }
 
     /**

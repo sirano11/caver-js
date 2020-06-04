@@ -17,7 +17,7 @@
 */
 
 const _ = require('lodash')
-const scrypt = require('scrypt-shim')
+const scrypt = require('@web3-js/scrypt-shim')
 const uuid = require('uuid')
 const cryp = typeof global === 'undefined' ? require('crypto-browserify') : require('crypto')
 const AccountLib = require('eth-lib/lib/account')
@@ -41,12 +41,73 @@ class Keyring {
      *
      * `caver.wallet.keyring.generate()`
      *
-     * @param {string} entropy A random string to increase entropy.
+     * @param {string} [entropy] A random string to increase entropy.
      * @return {Keyring}
      */
     static generate(entropy) {
         const random = AccountLib.create(entropy || utils.randomHex(32))
         return Keyring.createWithSingleKey(random.address, random.privateKey)
+    }
+
+    /**
+     * generates a single private key string
+     *
+     * `caver.wallet.keyring.generateSingleKey()`
+     *
+     * @param {string} [entropy] A random string to increase entropy.
+     * @return {String}
+     */
+    static generateSingleKey(entropy) {
+        return AccountLib.create(entropy || utils.randomHex(32)).privateKey
+    }
+
+    /**
+     * generates an array of private key strings
+     *
+     * `caver.wallet.keyring.generateMultipleKeys()`
+     *
+     * @param {number} num A length of keys.
+     * @param {string} [entropy] A random string to increase entropy.
+     * @return {Array.<String>}
+     */
+    static generateMultipleKeys(num, entropy) {
+        if (num === undefined || !_.isNumber(num) || _.isString(num)) {
+            throw new Error(`To generate random multiple private keys, the number of keys should be defined.`)
+        }
+
+        const randomKeys = []
+        for (let i = 0; i < num; i++) {
+            randomKeys.push(AccountLib.create(entropy || utils.randomHex(32)).privateKey)
+        }
+        return randomKeys
+    }
+
+    /**
+     * generates an array in which keys to be used for each role are defined as an array.
+     *
+     * `caver.wallet.keyring.generateRoleBasedKeys()`
+     *
+     * @param {Array.<number>} numArr An array containing the number of keys for each role.
+     * @param {string} [entropy] A random string to increase entropy.
+     * @return {Array.<Array.<String>>}
+     */
+    static generateRoleBasedKeys(numArr, entropy) {
+        if (numArr === undefined || !_.isArray(numArr) || _.isString(numArr)) {
+            throw new Error(
+                `To generate random role-based private keys, an array containing the number of keys for each role should be defined.`
+            )
+        }
+        if (numArr.length > KEY_ROLE.RoleLast) {
+            throw new Error(`Unsupported role. The length of array should be less than ${KEY_ROLE.RoleLast}.`)
+        }
+
+        const randomKeys = [[], [], []]
+        for (let i = 0; i < numArr.length; i++) {
+            for (let j = 0; j < numArr[i]; j++) {
+                randomKeys[i].push(AccountLib.create(entropy || utils.randomHex(32)).privateKey)
+            }
+        }
+        return randomKeys
     }
 
     /**
@@ -69,7 +130,7 @@ class Keyring {
     }
 
     /**
-     * creates a keyring instance from private key string. KlaytnWalletKey format also can be handled.
+     * creates a keyring instance from a private key string. KlaytnWalletKey format also can be handled.
      *
      * @param {string} privateKey The key parameter can be either normal private key or KlaytnWalletKey format.
      * @return {Keyring}
@@ -83,7 +144,7 @@ class Keyring {
     }
 
     /**
-     * creates a keyring instance from KlaytnWalletKey string.
+     * creates a keyring instance from a KlaytnWalletKey string.
      *
      * @param {string} klaytnWalletKey A key string in KlaytnWalletKey format.
      * @return {Keyring}
@@ -98,7 +159,7 @@ class Keyring {
     }
 
     /**
-     * creates a keyring instance from address and private key string.
+     * creates a keyring instance from an address and a private key string.
      *
      * @param {string} address An address of keyring.
      * @param {string} key A private key string.
@@ -114,7 +175,7 @@ class Keyring {
     }
 
     /**
-     * creates a keyring instance from address and multiple private key strings.
+     * creates a keyring instance from an address and multiple private key strings.
      *
      * @param {string} address An address of keyring.
      * @param {Array.<string>} keyArray An array of private key strings.
@@ -128,7 +189,7 @@ class Keyring {
     }
 
     /**
-     * creates a keyring instance from address and multiple private key strings.
+     * creates a keyring instance from an address and an array in which keys to be used for each role are defined as an array.
      *
      * @param {string} address An address of keyring.
      * @param {Array.<Array.<string>>} roledBasedKeyArray A two-dimensional array containing arrays of private key strings for each role.
@@ -639,7 +700,7 @@ class Keyring {
     }
 }
 
-Keyring.PrivateKey = PrivateKey
+Keyring.privateKey = PrivateKey
 Keyring.role = KEY_ROLE
 
 module.exports = Keyring

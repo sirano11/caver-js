@@ -1615,6 +1615,89 @@ describe('caver.utils.parsePrivateKey', () => {
     })
 })
 
+describe('caver.utils.parseKlaytnWalletKey', () => {
+    it('CAVERJS-UNIT-ETC-220: should parse KlaytnWalletKey and return an array', () => {
+        const key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+
+        const parsed = caver.utils.parseKlaytnWalletKey(key)
+
+        expect(parsed[0]).to.be.equal('0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8')
+        expect(parsed[1]).to.be.equal('0x00')
+        expect(parsed[2]).to.be.equal('0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b')
+    })
+
+    it('CAVERJS-UNIT-ETC-221: should throw error when key is not in format of KlaytnWalletKey', () => {
+        // private key is not in hex
+        let key = '0xzza915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        let expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // type is not in hex
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80xzz0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // address is not in hex
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebfzz'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // without '0x' separator
+        key = '45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d800a94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // too many '0x'
+        key = '0x0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // without '0x' for type
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // without '0x' for address
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x00a94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+    })
+
+    it('CAVERJS-UNIT-ETC-222: should throw error when private key is invalid', () => {
+        // invalid length
+        let key = '0xa915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        let expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // invalid range
+        key = '0x00000000000000000000000000000000000000000000000000000000000000000x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+    })
+
+    it('CAVERJS-UNIT-ETC-223: should throw error when human readable is invalid', () => {
+        // invalid value
+        let key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x030xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        let expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        // invalid length
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x0000xa94f5374fce5edbc8e2a8697c15331677e6ebf0b'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+    })
+
+    it('CAVERJS-UNIT-ETC-224: should throw error when addresss is invalid', () => {
+        let key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf'
+        let expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+
+        key = '0x45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d80x000xa94f5374fce5edbc8e2a8697c15331677e6ebf0baf'
+        expectedError = `Invalid KlaytnWalletKey format: ${key}`
+        expect(() => caver.utils.parseKlaytnWalletKey(key)).to.throw(expectedError)
+    })
+})
+
 describe('caver.utils.resolveSignature', () => {
     it('CAVERJS-UNIT-ETC-211: should return an array of signature from object(lowercase)', () => {
         const signature = {
@@ -1676,5 +1759,218 @@ describe('caver.utils.resolveSignature', () => {
         expect(resolved[0]).to.be.equals(expected[0])
         expect(resolved[1]).to.be.equals(expected[1])
         expect(resolved[2]).to.be.equals(expected[2])
+    })
+})
+
+describe('caver.utils.convertFromPeb', () => {
+    it('CAVERJS-UNIT-ETC-225: should convert to peb from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN(amount)
+
+        const converted = caver.utils.convertFromPeb(amount, 'peb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-226: should convert to kpeb from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'kpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-227: should convert to Mpeb from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'Mpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-228: should convert to Gpeb from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'Gpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-229: should convert to Ston from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'Ston')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-230: should convert to uKLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'uKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-231: should convert to mKLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'mKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-232: should convert to KLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'KLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-233: should convert to kKLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'kKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-234: should convert to MKLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1000')
+
+        const converted = caver.utils.convertFromPeb(amount, 'MKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-235: should convert to GKLAY from peb', () => {
+        const amount = '1000000000000000000000000000'
+        const expected = new caver.utils.BN('1')
+
+        const converted = caver.utils.convertFromPeb(amount, 'GKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+})
+
+describe('caver.utils.convertToPeb', () => {
+    it('CAVERJS-UNIT-ETC-236: should convert to peb from peb', () => {
+        const expected = new caver.utils.BN('1')
+
+        const converted = caver.utils.convertToPeb(1, 'peb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-237: should convert to peb from kpeb', () => {
+        const expected = new caver.utils.BN('1000')
+
+        const converted = caver.utils.convertToPeb(1, 'kpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-238: should convert to peb from Mpeb', () => {
+        const expected = new caver.utils.BN('1000000')
+
+        const converted = caver.utils.convertToPeb(1, 'Mpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-239: should convert to peb from Gpeb', () => {
+        const expected = new caver.utils.BN('1000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'Gpeb')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-240: should convert to peb from Ston', () => {
+        const expected = new caver.utils.BN('1000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'Ston')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-241: should convert to peb from uKLAY', () => {
+        const expected = new caver.utils.BN('1000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'uKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-242: should convert to peb from mKLAY', () => {
+        const expected = new caver.utils.BN('1000000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'mKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-243: should convert to peb from KLAY', () => {
+        const expected = new caver.utils.BN('1000000000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'KLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-244: should convert to peb from kKLAY', () => {
+        const expected = new caver.utils.BN('1000000000000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'kKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-245: should convert to peb from MKLAY', () => {
+        const expected = new caver.utils.BN('1000000000000000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'MKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
+    })
+
+    it('CAVERJS-UNIT-ETC-246: should convert to peb from GKLAY', () => {
+        const expected = new caver.utils.BN('1000000000000000000000000000')
+
+        const converted = caver.utils.convertToPeb(1, 'GKLAY')
+
+        expect(caver.utils.isBN(converted)).to.be.true
+        expect(converted.eq(expected)).to.be.true
     })
 })

@@ -36,6 +36,8 @@ const TIMEOUTBLOCK = 50
 const AVERAGE_BLOCK_TIME = 1 // 1s
 const POLLINGTIMEOUT = AVERAGE_BLOCK_TIME * TIMEOUTBLOCK // ~average block time (seconds) * TIMEOUTBLOCK
 
+const TransactionDecoder = require('../../caver-transaction/src/transactionDecoder/transactionDecoder')
+
 function Method(options) {
     // call, name should be existed to create a method.
     if (!options.call || !options.name) throw errors.needNameCallPropertyToCreateMethod
@@ -467,7 +469,10 @@ function buildCall() {
 }
 
 function _confirmTransaction(defer, result, payload) {
-    const payloadTxObject = (payload.params && _.isObject(payload.params[0]) && payload.params[0]) || {}
+    let payloadTxObject = (payload.params && _.isObject(payload.params[0]) && payload.params[0]) || {}
+
+    // If payload.params[0] is RLP-encoded string, decode RLP-encoded string to Transaction instance.
+    if (_.isString(payload.params[0])) payloadTxObject = TransactionDecoder.decode(payload.params[0])
 
     // mutableConfirmationPack will be used in
     // 1) checkConfirmation,
@@ -671,26 +676,26 @@ const checkForContractDeployment = (mutableConfirmationPack, receipt, sub) => {
         return
     }
 
+    if (!receipt.status && receipt.txError) {
+        const receiptJSON = JSON.stringify(receipt, null, 2)
+        utils._fireError(new Error(`${errors.txErrorTable[receipt.txError]}\n ${receiptJSON}`), defer.eventEmitter, defer.reject)
+    }
+
     _klaytnCall.getCode(receipt.contractAddress, (e, code) => {
         if (!code) return
 
-        if (code.length > 2) {
-            defer.eventEmitter.emit('receipt', receipt)
+        defer.eventEmitter.emit('receipt', receipt)
 
-            // if contract, return instance instead of receipt
-            defer.resolve(
-                (method.extraFormatters &&
-                    method.extraFormatters.contractDeployFormatter &&
-                    method.extraFormatters.contractDeployFormatter(receipt)) ||
-                    receipt
-            )
+        // if contract, return instance instead of receipt
+        defer.resolve(
+            (method.extraFormatters &&
+                method.extraFormatters.contractDeployFormatter &&
+                method.extraFormatters.contractDeployFormatter(receipt)) ||
+                receipt
+        )
 
-            // need to remove listeners, as they aren't removed automatically when succesfull
-            if (canUnsubscribe) defer.eventEmitter.removeAllListeners()
-        } else {
-            // code.length <= 2 means, contract code couldn't be stored.
-            utils._fireError(errors.contractCouldntBeStored, defer.eventEmitter, defer.reject)
-        }
+        // need to remove listeners, as they aren't removed automatically when succesfull
+        if (canUnsubscribe) defer.eventEmitter.removeAllListeners()
 
         if (canUnsubscribe) sub.unsubscribe()
         mutableConfirmationPack.promiseResolved = true
