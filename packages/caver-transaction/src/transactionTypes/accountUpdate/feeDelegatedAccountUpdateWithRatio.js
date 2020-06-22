@@ -72,7 +72,11 @@ class FeeDelegatedAccountUpdateWithRatio extends AbstractFeeDelegatedWithRatioTr
      *                               The object can define `from`, `account`, `nonce`, `gas`, `gasPrice`, `feeRatio`, `signatures`, `feePayer`, `feePayerSignatures` and `chainId`.
      */
     constructor(createTxObj) {
-        if (_.isString(createTxObj)) createTxObj = _decode(createTxObj)
+        if (_.isString(createTxObj)) {
+            createTxObj = _decode(createTxObj)
+            createTxObj.account = Account.createFromRLPEncoding(createTxObj.from, createTxObj.rlpEncodedKey)
+        }
+
         super(TX_TYPE_STRING.TxTypeFeeDelegatedAccountUpdateWithRatio, createTxObj)
         this.account = createTxObj.account
     }
@@ -98,6 +102,8 @@ class FeeDelegatedAccountUpdateWithRatio extends AbstractFeeDelegatedWithRatioTr
      */
     getRLPEncoding() {
         this.validateOptionalValues()
+        const signatures = this.signatures.map(sig => sig.encode())
+        const feePayerSignatures = this.feePayerSignatures.map(sig => sig.encode())
 
         return (
             TX_TYPE_TAG.TxTypeFeeDelegatedAccountUpdateWithRatio +
@@ -108,9 +114,9 @@ class FeeDelegatedAccountUpdateWithRatio extends AbstractFeeDelegatedWithRatioTr
                 this.from.toLowerCase(),
                 this.account.getRLPEncodingAccountKey(),
                 this.feeRatio,
-                this.signatures,
+                signatures,
                 this.feePayer.toLowerCase(),
-                this.feePayerSignatures,
+                feePayerSignatures,
             ]).slice(2)
         )
     }

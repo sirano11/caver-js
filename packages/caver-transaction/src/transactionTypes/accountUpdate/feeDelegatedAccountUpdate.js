@@ -71,7 +71,11 @@ class FeeDelegatedAccountUpdate extends AbstractFeeDelegatedTransaction {
      *                               The object can define `from`, `account`, `nonce`, `gas`, `gasPrice`, `signatures`, `feePayer`, `feePayerSignatures` and `chainId`.
      */
     constructor(createTxObj) {
-        if (_.isString(createTxObj)) createTxObj = _decode(createTxObj)
+        if (_.isString(createTxObj)) {
+            createTxObj = _decode(createTxObj)
+            createTxObj.account = Account.createFromRLPEncoding(createTxObj.from, createTxObj.rlpEncodedKey)
+        }
+
         super(TX_TYPE_STRING.TxTypeFeeDelegatedAccountUpdate, createTxObj)
         this.account = createTxObj.account
     }
@@ -97,6 +101,8 @@ class FeeDelegatedAccountUpdate extends AbstractFeeDelegatedTransaction {
      */
     getRLPEncoding() {
         this.validateOptionalValues()
+        const signatures = this.signatures.map(sig => sig.encode())
+        const feePayerSignatures = this.feePayerSignatures.map(sig => sig.encode())
 
         return (
             TX_TYPE_TAG.TxTypeFeeDelegatedAccountUpdate +
@@ -106,9 +112,9 @@ class FeeDelegatedAccountUpdate extends AbstractFeeDelegatedTransaction {
                 Bytes.fromNat(this.gas),
                 this.from.toLowerCase(),
                 this.account.getRLPEncodingAccountKey(),
-                this.signatures,
+                signatures,
                 this.feePayer.toLowerCase(),
-                this.feePayerSignatures,
+                feePayerSignatures,
             ]).slice(2)
         )
     }

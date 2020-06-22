@@ -1272,13 +1272,13 @@ describe('caver.utils.isEmptySig', () => {
 
         isDefault = caver.utils.isEmptySig([['0x01', '0x', '0x']])
         expect(isDefault).to.be.true
+
+        isDefault = caver.utils.isEmptySig([['0x01', '0x', '0x'], ['0x01', '0x', '0x']])
+        expect(isDefault).to.be.true
     })
 
     it('CAVERJS-UNIT-ETC-179: caver.utils.isEmptySig should false if signatures is not same with default signatures', () => {
-        let isDefault = caver.utils.isEmptySig([['0x01', '0x', '0x'], ['0x01', '0x', '0x']])
-        expect(isDefault).to.be.false
-
-        isDefault = caver.utils.isEmptySig([
+        let isDefault = caver.utils.isEmptySig([
             '0x25',
             '0xb2a5a15550ec298dc7dddde3774429ed75f864c82caeb5ee24399649ad731be9',
             '0x29da1014d16f2011b3307f7bbe1035b6e699a4204fc416c763def6cefd976567',
@@ -1972,5 +1972,25 @@ describe('caver.utils.convertToPeb', () => {
 
         expect(caver.utils.isBN(converted)).to.be.true
         expect(converted.eq(expected)).to.be.true
+    })
+})
+
+describe('caver.utils.recover', () => {
+    it('CAVERJS-UNIT-ETC-248: return recovered address when input is message, signature', () => {
+        const keyring = caver.wallet.keyring.generate()
+        const message = 'Some data'
+        const signed = keyring.signMessage(message, caver.wallet.keyring.role.roleTransactionKey)
+
+        const result = caver.utils.recover(signed.message, signed.signatures[0])
+        expect(result).to.equal(keyring.address)
+    })
+
+    it('CAVERJS-UNIT-ETC-249: return recovered address when input is messageHash, signature, prefixed', () => {
+        const keyring = caver.wallet.keyring.generate()
+        const message = 'Some data'
+        const signed = keyring.signMessage(message, caver.wallet.keyring.role.roleTransactionKey)
+
+        const result = caver.utils.recover(signed.messageHash, signed.signatures[0], true)
+        expect(result).to.equal(keyring.address)
     })
 })

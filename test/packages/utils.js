@@ -22,8 +22,10 @@ const AccountForUpdate = require('../../packages/caver-klay/caver-klay-accounts/
 const Account = require('../../packages/caver-account')
 const utils = require('../../packages/caver-utils')
 
-const Keyring = require('../../packages/caver-wallet/src/keyring/keyring')
+const Keyring = require('../../packages/caver-wallet/src/keyring/keyringFactory')
 const { KEY_ROLE } = require('../../packages/caver-wallet/src/keyring/keyringHelper')
+
+const SignatureData = require('../../packages/caver-wallet/src/keyring/signatureData')
 
 const unitMap = {
     peb: '1',
@@ -41,22 +43,20 @@ const unitMap = {
 
 const generateDecoupledKeyring = () => {
     const keyring = Keyring.generate()
-    keyring.keys = Keyring.generateSingleKey()
+    keyring.key = Keyring.generateSingleKey()
     return keyring
 }
 
 const generateMultiSigKeyring = (num = 3) => {
-    const keyring = Keyring.generate()
-    keyring.keys = Keyring.generateMultipleKeys(num)
+    const keyring = Keyring.createWithMultipleKey(Keyring.generate().address, Keyring.generateMultipleKeys(num))
     return keyring
 }
 
 const generateRoleBasedKeyring = numArr => {
     if (numArr === undefined) {
-        numArr = Array(KEY_ROLE.RoleLast).fill(1)
+        numArr = Array(KEY_ROLE.roleLast).fill(1)
     }
-    const keyring = Keyring.generate()
-    keyring.keys = Keyring.generateRoleBasedKeys(numArr)
+    const keyring = Keyring.createWithRoleBasedKey(Keyring.generate().address, Keyring.generateRoleBasedKeys(numArr))
     return keyring
 }
 
@@ -149,13 +149,12 @@ const checkSignature = (tx, expected = {}) => {
     expect(tx.signatures.length).to.equal(expectedLength)
 
     for (let i = 0; i < expectedLength; i++) {
-        expect(_.isArray(tx.signatures[i])).to.be.true
-        expect(tx.signatures[i].length).to.equal(3)
+        expect(tx.signatures[i] instanceof SignatureData).to.be.true
 
         if (expectedSignatures) {
-            for (let j = 0; j < 3; j++) {
-                expect(tx.signatures[i][j]).to.equal(expectedSignatures[i][j])
-            }
+            expect(tx.signatures[i].v).to.equal(expectedSignatures[i][0])
+            expect(tx.signatures[i].r).to.equal(expectedSignatures[i][1])
+            expect(tx.signatures[i].s).to.equal(expectedSignatures[i][2])
         }
     }
 }
@@ -174,13 +173,12 @@ const checkFeePayerSignature = (tx, expected = {}) => {
     expect(tx.feePayerSignatures.length).to.equal(expectedLength)
 
     for (let i = 0; i < expectedLength; i++) {
-        expect(_.isArray(tx.feePayerSignatures[i])).to.be.true
-        expect(tx.feePayerSignatures[i].length).to.equal(3)
+        expect(tx.feePayerSignatures[i] instanceof SignatureData).to.be.true
 
         if (expectedSignatures) {
-            for (let j = 0; j < 3; j++) {
-                expect(tx.feePayerSignatures[i][j]).to.equal(expectedSignatures[i][j])
-            }
+            expect(tx.feePayerSignatures[i].v).to.equal(expectedSignatures[i][0])
+            expect(tx.feePayerSignatures[i].r).to.equal(expectedSignatures[i][1])
+            expect(tx.feePayerSignatures[i].s).to.equal(expectedSignatures[i][2])
         }
     }
 }

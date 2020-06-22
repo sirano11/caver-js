@@ -74,7 +74,7 @@ class SmartContractDeploy extends AbstractTransaction {
         if (_.isString(createTxObj)) createTxObj = _decode(createTxObj)
         super(TX_TYPE_STRING.TxTypeSmartContractDeploy, createTxObj)
         this.to = createTxObj.to || '0x'
-        this.value = createTxObj.value
+        this.value = createTxObj.value || '0x0'
 
         if (createTxObj.input && createTxObj.data)
             throw new Error(`'input' and 'data' properties cannot be defined at the same time, please use either 'input' or 'data'.`)
@@ -160,6 +160,7 @@ class SmartContractDeploy extends AbstractTransaction {
      */
     getRLPEncoding() {
         this.validateOptionalValues()
+        const signatures = this.signatures.map(sig => sig.encode())
 
         return (
             TX_TYPE_TAG.TxTypeSmartContractDeploy +
@@ -173,7 +174,7 @@ class SmartContractDeploy extends AbstractTransaction {
                 this.input,
                 Bytes.fromNat(this.humanReadable === true ? '0x1' : '0x0'),
                 Bytes.fromNat(this.codeFormat),
-                this.signatures,
+                signatures,
             ]).slice(2)
         )
     }

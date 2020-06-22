@@ -67,7 +67,11 @@ class AccountUpdate extends AbstractTransaction {
      *                                      The object can define `from`, `account`, `nonce`, `gas`, `gasPrice`, `signatures` and `chainId`.
      */
     constructor(createTxObj) {
-        if (_.isString(createTxObj)) createTxObj = _decode(createTxObj)
+        if (_.isString(createTxObj)) {
+            createTxObj = _decode(createTxObj)
+            createTxObj.account = Account.createFromRLPEncoding(createTxObj.from, createTxObj.rlpEncodedKey)
+        }
+
         super(TX_TYPE_STRING.TxTypeAccountUpdate, createTxObj)
         this.account = createTxObj.account
     }
@@ -93,6 +97,7 @@ class AccountUpdate extends AbstractTransaction {
      */
     getRLPEncoding() {
         this.validateOptionalValues()
+        const signatures = this.signatures.map(sig => sig.encode())
 
         return (
             TX_TYPE_TAG.TxTypeAccountUpdate +
@@ -102,7 +107,7 @@ class AccountUpdate extends AbstractTransaction {
                 Bytes.fromNat(this.gas),
                 this.from.toLowerCase(),
                 this.account.getRLPEncodingAccountKey(),
-                this.signatures,
+                signatures,
             ]).slice(2)
         )
     }

@@ -30,12 +30,16 @@ const expect = chai.expect
 const testRPCURL = require('../testrpc')
 
 const Caver = require('../../index.js')
-const Keyring = require('../../packages/caver-wallet/src/keyring/keyring')
+const AbstractKeyring = require('../../packages/caver-wallet/src/keyring/abstractKeyring')
+const SingleKeyring = require('../../packages/caver-wallet/src/keyring/singleKeyring')
+const MultipleKeyring = require('../../packages/caver-wallet/src/keyring/multipleKeyring')
 const PrivateKey = require('../../packages/caver-wallet/src/keyring/privateKey')
 
 const ValueTransfer = require('../../packages/caver-transaction/src/transactionTypes/valueTransfer/valueTransfer')
 const FeeDelegatedValueTransfer = require('../../packages/caver-transaction/src/transactionTypes/valueTransfer/feeDelegatedValueTransfer')
 const AccountUpdate = require('../../packages/caver-transaction/src/transactionTypes/accountUpdate/accountUpdate')
+
+const SignatureData = require('../../packages/caver-wallet/src/keyring/signatureData')
 
 const { generateDecoupledKeyring, generateMultiSigKeyring, generateRoleBasedKeyring } = require('./utils')
 
@@ -46,8 +50,14 @@ beforeEach(() => {
 })
 
 function validateKeyringInWallet(data, { expectedAddress, expectedKey } = {}) {
-    expect(data instanceof Keyring).to.be.true
-    const objectKeys = ['_address', '_keys']
+    expect(data instanceof AbstractKeyring).to.be.true
+    const objectKeys = ['_address']
+
+    if (data instanceof SingleKeyring) {
+        objectKeys.push('_key')
+    } else {
+        objectKeys.push('_keys')
+    }
 
     expect(Object.getOwnPropertyNames(data)).to.deep.equal(objectKeys)
 
@@ -58,15 +68,25 @@ function validateKeyringInWallet(data, { expectedAddress, expectedKey } = {}) {
     }
 
     if (expectedKey !== undefined) {
-        if (_.isArray(expectedKey) && _.isString(expectedKey[0])) expectedKey = [expectedKey, [], []]
-        if (_.isString(expectedKey)) expectedKey = [[expectedKey], [], []]
-        for (let i = 0; i < data.keys.length; i++) {
-            for (let j = 0; j < data.keys[i].length; j++) {
-                const privateKeyString = expectedKey[i][j] instanceof PrivateKey ? expectedKey[i][j].privateKey : expectedKey[i][j]
-                expect(data.keys[i][j].privateKey.toLowerCase()).to.equal(privateKeyString.toLowerCase())
+        if (data instanceof SingleKeyring) {
+            comparePrivateKey(expectedKey, data.key)
+        } else if (data instanceof MultipleKeyring) {
+            for (let i = 0; i < data.keys.length; i++) {
+                comparePrivateKey(expectedKey[i], data.keys[i])
+            }
+        } else {
+            for (let i = 0; i < data.keys.length; i++) {
+                for (let j = 0; j < data.keys[i].length; j++) {
+                    comparePrivateKey(expectedKey[i][j], data.keys[i][j])
+                }
             }
         }
     }
+}
+
+function comparePrivateKey(expected, actual) {
+    const privateKeyString = expected instanceof PrivateKey ? expected.privateKey : expected
+    expect(actual.privateKey.toLowerCase()).to.equal(privateKeyString.toLowerCase())
 }
 
 describe('wallet.generate', () => {
@@ -109,7 +129,7 @@ describe('wallet.newKeyring', () => {
         it('should create keyring instances with parameters and add to in-memory wallet', () => {
             const addSpy = sinon.spy(caver.wallet, 'add')
             const keyring = caver.wallet.keyring.generate()
-            const added = caver.wallet.newKeyring(keyring.address, keyring.keys[0][0].privateKey)
+            const added = caver.wallet.newKeyring(keyring.address, keyring.key.privateKey)
 
             validateKeyringInWallet(added, { expectedAddress: keyring.address, expectedKey: keyring.keys })
             expect(addSpy).to.have.been.calledOnce
@@ -161,40 +181,34 @@ describe('wallet.updateKeyring', () => {
     context('CAVERJS-UNIT-KEYRINGCONTAINER-007: input: coupled keyring', () => {
         it('should update key of keyring', () => {
             const coupled = caver.wallet.keyring.generate()
-            const copySpy = sinon.spy(coupled, 'copy')
             const decoupled = caver.wallet.keyring.createWithSingleKey(coupled.address, caver.wallet.keyring.generateSingleKey())
             caver.wallet.add(decoupled)
 
             const updated = caver.wallet.updateKeyring(coupled)
             const keyringFromContainer = caver.wallet.getKeyring(coupled.address)
 
-            validateKeyringInWallet(updated, { expectedAddress: decoupled.address, expectedKey: coupled.keys })
-            validateKeyringInWallet(keyringFromContainer, { expectedAddress: coupled.address, expectedKey: coupled.keys })
-
-            expect(copySpy).to.have.been.calledOnce
+            validateKeyringInWallet(updated, { expectedAddress: decoupled.address, expectedKey: coupled.key })
+            validateKeyringInWallet(keyringFromContainer, { expectedAddress: coupled.address, expectedKey: coupled.key })
         })
     })
 
     context('CAVERJS-UNIT-KEYRINGCONTAINER-008: input: decoupled keyring', () => {
         it('should update key of keyring', () => {
             const coupled = caver.wallet.keyring.generate()
-            const copySpy = sinon.spy(coupled, 'copy')
             const decoupled = caver.wallet.keyring.createWithSingleKey(coupled.address, caver.wallet.keyring.generateSingleKey())
             caver.wallet.add(coupled)
 
             const updated = caver.wallet.updateKeyring(decoupled)
             const keyringFromContainer = caver.wallet.getKeyring(coupled.address)
 
-            validateKeyringInWallet(updated, { expectedAddress: coupled.address, expectedKey: decoupled.keys })
-            validateKeyringInWallet(keyringFromContainer, { expectedAddress: coupled.address, expectedKey: decoupled.keys })
-            expect(copySpy).to.have.been.calledOnce
+            validateKeyringInWallet(updated, { expectedAddress: coupled.address, expectedKey: decoupled.key })
+            validateKeyringInWallet(keyringFromContainer, { expectedAddress: coupled.address, expectedKey: decoupled.key })
         })
     })
 
     context('CAVERJS-UNIT-KEYRINGCONTAINER-009: input: multiSig keyring', () => {
         it('should update key of keyring', () => {
             const coupled = caver.wallet.keyring.generate()
-            const copySpy = sinon.spy(coupled, 'copy')
             const multiSig = generateMultiSigKeyring()
             multiSig.address = coupled.address
             caver.wallet.add(coupled)
@@ -204,7 +218,6 @@ describe('wallet.updateKeyring', () => {
 
             validateKeyringInWallet(updated, { expectedAddress: coupled.address, expectedKey: multiSig.keys })
             validateKeyringInWallet(keyringFromContainer, { expectedAddress: coupled.address, expectedKey: multiSig.keys })
-            expect(copySpy).to.have.been.calledOnce
         })
     })
 
@@ -375,7 +388,7 @@ describe('wallet.remove', () => {
     })
 })
 
-describe('wallet.signWithKey', () => {
+describe('wallet.sign', () => {
     context('CAVERJS-UNIT-KEYRINGCONTAINER-023: input: address, value transfer transaction', () => {
         it('should sign to transaction and return hash', async () => {
             const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
@@ -383,10 +396,10 @@ describe('wallet.signWithKey', () => {
             const vt = generateValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendSignatures')
 
-            await caver.wallet.signWithKey(keyring.address, vt)
+            await caver.wallet.sign(keyring.address, vt)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -401,10 +414,10 @@ describe('wallet.signWithKey', () => {
             const vt = generateValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendSignatures')
 
-            await caver.wallet.signWithKey(keyring.address, vt, 2)
+            await caver.wallet.sign(keyring.address, vt, 2)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -420,8 +433,15 @@ describe('wallet.signWithKey', () => {
 
             const txHash = '0xd4aab6590bdb708d1d3eafe95a967dafcd2d7cde197e512f3f0b8158e7b65fd1'
 
-            const expectedError = `In order to pass a custom hasher, use the third parameter.`
-            await expect(caver.wallet.signWithKey(keyring.address, vt, () => txHash)).to.be.rejectedWith(expectedError)
+            const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
+            const signSpy = sinon.spy(keyring, 'sign')
+            const appendSpy = sinon.spy(vt, 'appendSignatures')
+
+            await caver.wallet.sign(keyring.address, vt, () => txHash)
+
+            expect(fillFormatSpy).to.have.been.calledOnce
+            expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 0, undefined)
+            expect(appendSpy).to.have.been.calledOnce
         })
     })
 
@@ -434,10 +454,10 @@ describe('wallet.signWithKey', () => {
             const txHash = '0xd4aab6590bdb708d1d3eafe95a967dafcd2d7cde197e512f3f0b8158e7b65fd1'
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendSignatures')
 
-            await caver.wallet.signWithKey(keyring.address, vt, 1, () => txHash)
+            await caver.wallet.sign(keyring.address, vt, 1, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 0, 1)
@@ -454,10 +474,10 @@ describe('wallet.signWithKey', () => {
             const txHash = '0xd4aab6590bdb708d1d3eafe95a967dafcd2d7cde197e512f3f0b8158e7b65fd1'
 
             const fillFormatSpy = sinon.spy(updateTx, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(updateTx, 'appendSignatures')
 
-            await caver.wallet.signWithKey(keyring.address, updateTx, 1, () => txHash)
+            await caver.wallet.sign(keyring.address, updateTx, 1, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 1, 1)
@@ -473,7 +493,7 @@ describe('wallet.signWithKey', () => {
 
             const invalidIndex = 3
             const expectedError = `Invalid index(${invalidIndex}): index must be less than the length of keys(${invalidIndex}).`
-            await expect(caver.wallet.signWithKey(keyring.address, vt, invalidIndex)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.sign(keyring.address, vt, invalidIndex)).to.be.rejectedWith(expectedError)
         })
     })
 
@@ -488,7 +508,7 @@ describe('wallet.signWithKey', () => {
                 const invalidTxHash = 'invalidTxHash'
 
                 const expectedError = `Invalid transaction hash: ${invalidTxHash}`
-                await expect(caver.wallet.signWithKey(keyring.address, vt, 0, () => invalidTxHash)).to.be.rejectedWith(expectedError)
+                await expect(caver.wallet.sign(keyring.address, vt, 0, () => invalidTxHash)).to.be.rejectedWith(expectedError)
             })
         }
     )
@@ -500,12 +520,12 @@ describe('wallet.signWithKey', () => {
             const vt = generateValueTransfer(keyring)
 
             const expectedError = `Failed to find keyring from wallet with ${keyring.address}`
-            await expect(caver.wallet.signWithKey(keyring.address, vt)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.sign(keyring.address, vt)).to.be.rejectedWith(expectedError)
         })
     })
 })
 
-describe('wallet.signWithKeys', () => {
+describe('wallet.sign', () => {
     context('CAVERJS-UNIT-KEYRINGCONTAINER-031: input: address, value transfer transaction', () => {
         it('should sign to transaction and return hash', async () => {
             const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
@@ -513,10 +533,10 @@ describe('wallet.signWithKeys', () => {
             const vt = generateValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKeys')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendSignatures')
 
-            await caver.wallet.signWithKeys(keyring.address, vt)
+            await caver.wallet.sign(keyring.address, vt)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -533,10 +553,10 @@ describe('wallet.signWithKeys', () => {
             const txHash = '0xe9a11d9ef95fb437f75d07ce768d43e74f158dd54b106e7d3746ce29d545b550'
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKeys')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendSignatures')
 
-            await caver.wallet.signWithKeys(keyring.address, vt, () => txHash)
+            await caver.wallet.sign(keyring.address, vt, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 0)
@@ -553,10 +573,10 @@ describe('wallet.signWithKeys', () => {
             const txHash = '0xe9a11d9ef95fb437f75d07ce768d43e74f158dd54b106e7d3746ce29d545b550'
 
             const fillFormatSpy = sinon.spy(updateTx, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKeys')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(updateTx, 'appendSignatures')
 
-            await caver.wallet.signWithKeys(keyring.address, updateTx, () => txHash)
+            await caver.wallet.sign(keyring.address, updateTx, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 1)
@@ -573,7 +593,7 @@ describe('wallet.signWithKeys', () => {
             const invalidTxHash = 'invalidTxHash'
 
             const expectedError = `Invalid transaction hash: ${invalidTxHash}`
-            await expect(caver.wallet.signWithKeys(keyring.address, vt, () => invalidTxHash)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.sign(keyring.address, vt, () => invalidTxHash)).to.be.rejectedWith(expectedError)
         })
     })
 
@@ -583,14 +603,14 @@ describe('wallet.signWithKeys', () => {
 
             const vt = generateValueTransfer(keyring)
 
-            const expectedError = `Failed to find the keyring from the wallet with the given address: ${keyring.address}`
-            await expect(caver.wallet.signWithKeys(keyring.address, vt)).to.be.rejectedWith(expectedError)
+            const expectedError = `Failed to find keyring from wallet with ${keyring.address}`
+            await expect(caver.wallet.sign(keyring.address, vt)).to.be.rejectedWith(expectedError)
         })
     })
 })
 
 describe('wallet.signMessage', () => {
-    context('CAVERJS-UNIT-KEYRINGCONTAINER-036: input: address, data', () => {
+    context('CAVERJS-UNIT-KEYRINGCONTAINER-036: input: address, data, role', () => {
         it('should sign to message and return signed result', () => {
             const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
 
@@ -599,14 +619,35 @@ describe('wallet.signMessage', () => {
             const getKeyringSpy = sinon.spy(caver.wallet, 'getKeyring')
             const signMessageSpy = sinon.spy(keyring, 'signMessage')
 
-            const signed = caver.wallet.signMessage(keyring.address, data)
+            const signed = caver.wallet.signMessage(keyring.address, data, caver.wallet.keyring.role.roleTransactionKey)
 
             expect(signed.messageHash).to.equal(caver.utils.hashMessage(data))
-            expect(_.isArray(signed.signature)).to.be.true
-            expect(signed.signature.length).to.equal(3)
+            expect(_.isArray(signed.signatures)).to.be.true
+            expect(signed.signatures.length).to.equal(keyring.roleTransactionKey.length)
+            expect(signed.signatures[0] instanceof SignatureData).to.be.true
             expect(signed.message).to.equal(data)
             expect(getKeyringSpy).to.have.been.calledOnce
-            expect(signMessageSpy).to.have.been.calledWith(data, undefined, undefined)
+            expect(signMessageSpy).to.have.been.calledWith(data, 0, undefined)
+        })
+    })
+    context('CAVERJS-UNIT-KEYRINGCONTAINER-051: input: address, data, role, index', () => {
+        it('should sign to message and return signed result', () => {
+            const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
+
+            const data = 'Some data'
+
+            const getKeyringSpy = sinon.spy(caver.wallet, 'getKeyring')
+            const signMessageSpy = sinon.spy(keyring, 'signMessage')
+
+            const signed = caver.wallet.signMessage(keyring.address, data, caver.wallet.keyring.role.roleTransactionKey, 0)
+
+            expect(signed.messageHash).to.equal(caver.utils.hashMessage(data))
+            expect(_.isArray(signed.signatures)).to.be.true
+            expect(signed.signatures.length).to.equal(1)
+            expect(signed.signatures[0] instanceof SignatureData).to.be.true
+            expect(signed.message).to.equal(data)
+            expect(getKeyringSpy).to.have.been.calledOnce
+            expect(signMessageSpy).to.have.been.calledWith(data, 0, 0)
         })
     })
 
@@ -623,7 +664,7 @@ describe('wallet.signMessage', () => {
     })
 })
 
-describe('wallet.signFeePayerWithKey', () => {
+describe('wallet.signAsFeePayer', () => {
     context('CAVERJS-UNIT-KEYRINGCONTAINER-038: input: address, value transfer transaction', () => {
         it('should sign to transaction with roleFeePayerKey and return hash', async () => {
             const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
@@ -631,10 +672,10 @@ describe('wallet.signFeePayerWithKey', () => {
             const vt = generateFeeDelegatedValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
 
-            await caver.wallet.signFeePayerWithKey(keyring.address, vt)
+            await caver.wallet.signAsFeePayer(keyring.address, vt)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -649,10 +690,10 @@ describe('wallet.signFeePayerWithKey', () => {
             const vt = generateFeeDelegatedValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
 
-            await caver.wallet.signFeePayerWithKey(keyring.address, vt, 2)
+            await caver.wallet.signAsFeePayer(keyring.address, vt, 2)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -668,8 +709,15 @@ describe('wallet.signFeePayerWithKey', () => {
 
             const txHash = '0xe9a11d9ef95fb437f75d07ce768d43e74f158dd54b106e7d3746ce29d545b550'
 
-            const expectedError = `In order to pass a custom hasher, use the third parameter.`
-            await expect(caver.wallet.signFeePayerWithKey(keyring.address, vt, () => txHash)).to.be.rejectedWith(expectedError)
+            const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
+            const signSpy = sinon.spy(keyring, 'sign')
+            const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
+
+            await caver.wallet.signAsFeePayer(keyring.address, vt, () => txHash)
+
+            expect(fillFormatSpy).to.have.been.calledOnce
+            expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 2, undefined)
+            expect(appendSpy).to.have.been.calledOnce
         })
     })
 
@@ -682,10 +730,10 @@ describe('wallet.signFeePayerWithKey', () => {
             const txHash = '0xe9a11d9ef95fb437f75d07ce768d43e74f158dd54b106e7d3746ce29d545b550'
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKey')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
 
-            await caver.wallet.signFeePayerWithKey(keyring.address, vt, 1, () => txHash)
+            await caver.wallet.signAsFeePayer(keyring.address, vt, 1, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 2, 1)
@@ -701,7 +749,7 @@ describe('wallet.signFeePayerWithKey', () => {
 
             const invalidIndex = 4
             const expectedError = `Invalid index(${invalidIndex}): index must be less than the length of keys(${invalidIndex}).`
-            await expect(caver.wallet.signFeePayerWithKey(keyring.address, vt, invalidIndex)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.signAsFeePayer(keyring.address, vt, invalidIndex)).to.be.rejectedWith(expectedError)
         })
     })
 
@@ -716,9 +764,7 @@ describe('wallet.signFeePayerWithKey', () => {
                 const invalidTxHash = 'invalidTxHash'
 
                 const expectedError = `Invalid transaction hash: ${invalidTxHash}`
-                await expect(caver.wallet.signFeePayerWithKey(keyring.address, vt, 0, () => invalidTxHash)).to.be.rejectedWith(
-                    expectedError
-                )
+                await expect(caver.wallet.signAsFeePayer(keyring.address, vt, 0, () => invalidTxHash)).to.be.rejectedWith(expectedError)
             })
         }
     )
@@ -730,12 +776,12 @@ describe('wallet.signFeePayerWithKey', () => {
             const vt = generateFeeDelegatedValueTransfer(keyring)
 
             const expectedError = `Failed to find keyring from wallet with ${keyring.address}`
-            await expect(caver.wallet.signFeePayerWithKey(keyring.address, vt)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.signAsFeePayer(keyring.address, vt)).to.be.rejectedWith(expectedError)
         })
     })
 })
 
-describe('wallet.signFeePayerWithKeys', () => {
+describe('wallet.signAsFeePayer', () => {
     context('CAVERJS-UNIT-KEYRINGCONTAINER-045: input: address, value transfer transaction', () => {
         it('should sign to transaction with keys in roleFeePayerKey and return hash', async () => {
             const keyring = caver.wallet.add(generateRoleBasedKeyring([3, 2, 4]))
@@ -743,10 +789,10 @@ describe('wallet.signFeePayerWithKeys', () => {
             const vt = generateFeeDelegatedValueTransfer(keyring)
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKeys')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
 
-            await caver.wallet.signFeePayerWithKeys(keyring.address, vt)
+            await caver.wallet.signAsFeePayer(keyring.address, vt)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledOnce
@@ -763,10 +809,10 @@ describe('wallet.signFeePayerWithKeys', () => {
             const txHash = '0xe9a11d9ef95fb437f75d07ce768d43e74f158dd54b106e7d3746ce29d545b550'
 
             const fillFormatSpy = sinon.spy(vt, 'fillTransaction')
-            const signSpy = sinon.spy(keyring, 'signWithKeys')
+            const signSpy = sinon.spy(keyring, 'sign')
             const appendSpy = sinon.spy(vt, 'appendFeePayerSignatures')
 
-            await caver.wallet.signFeePayerWithKeys(keyring.address, vt, () => txHash)
+            await caver.wallet.signAsFeePayer(keyring.address, vt, () => txHash)
 
             expect(fillFormatSpy).to.have.been.calledOnce
             expect(signSpy).to.have.been.calledWith(txHash, '0x7e3', 2)
@@ -783,7 +829,7 @@ describe('wallet.signFeePayerWithKeys', () => {
             const invalidTxHash = 'invalidTxHash'
 
             const expectedError = `Invalid transaction hash: ${invalidTxHash}`
-            await expect(caver.wallet.signFeePayerWithKeys(keyring.address, vt, () => invalidTxHash)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.signAsFeePayer(keyring.address, vt, () => invalidTxHash)).to.be.rejectedWith(expectedError)
         })
     })
 
@@ -794,7 +840,7 @@ describe('wallet.signFeePayerWithKeys', () => {
             const vt = generateFeeDelegatedValueTransfer(keyring)
 
             const expectedError = `Failed to find keyring from wallet with ${keyring.address}`
-            await expect(caver.wallet.signFeePayerWithKeys(keyring.address, vt)).to.be.rejectedWith(expectedError)
+            await expect(caver.wallet.signAsFeePayer(keyring.address, vt)).to.be.rejectedWith(expectedError)
         })
     })
 })
