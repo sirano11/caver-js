@@ -372,7 +372,7 @@ class KlayRPC {
                 params: 0,
             }),
             new Method({
-                name: 'gasPriceAt',
+                name: 'getGasPriceAt',
                 call: 'klay_gasPriceAt',
                 params: 1,
                 inputFormatter: [formatters.inputDefaultBlockNumberFormatter],
@@ -398,7 +398,7 @@ class KlayRPC {
                 params: 0,
             }),
             new Method({
-                name: 'writeThroughCaching',
+                name: 'isWriteThroughCaching',
                 call: 'klay_writeThroughCaching',
                 params: 0,
             }),

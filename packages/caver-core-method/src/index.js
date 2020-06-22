@@ -409,9 +409,9 @@ const buildSendRequestFunc = (defer, sendSignedTx, sendTxCallback) => (payload, 
             let key = k
             if (key.startsWith('_')) key = key.slice(1)
             if (key === 'signatures' || key === 'feePayerSignatures') {
-                tx[key] = utils.transformSignaturesToObject(payload.params[0][k])
+                if (!utils.isEmptySig(payload.params[0][key])) tx[key] = utils.transformSignaturesToObject(payload.params[0][key])
             } else {
-                tx[key] = payload.params[0][k]
+                tx[key] = payload.params[0][key]
             }
         })
         payload.params[0] = tx
@@ -457,6 +457,7 @@ function buildCall() {
     const method = this
     const isSendTx =
         method.call === 'klay_sendTransaction' ||
+        method.call === 'klay_sendTransactionAsFeePayer' ||
         method.call === 'klay_sendRawTransaction' ||
         method.call === 'personal_sendTransaction' ||
         method.call === 'personal_sendValueTransfer' ||
