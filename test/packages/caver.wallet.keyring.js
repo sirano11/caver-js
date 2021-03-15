@@ -30,7 +30,7 @@ const testRPCURL = require('../testrpc')
 const Caver = require('../../index.js')
 const SingleKeyring = require('../../packages/caver-wallet/src/keyring/singleKeyring')
 const MultipleKeyring = require('../../packages/caver-wallet/src/keyring/multipleKeyring')
-const AbstractKeyring = require('../../packages/caver-wallet/src/keyring/abstractKeyring')
+const RoleBasedKeyring = require('../../packages/caver-wallet/src/keyring/roleBasedKeyring')
 const Account = require('../../packages/caver-account')
 const AccountKeyPublic = require('../../packages/caver-account/src/accountKey/accountKeyPublic')
 const AccountKeyWeightedMultiSig = require('../../packages/caver-account/src/accountKey/accountKeyWeightedMultiSig')
@@ -48,7 +48,7 @@ beforeEach(() => {
 })
 
 function validateKeyring(data, { expectedAddress, expectedKey } = {}) {
-    expect(data instanceof AbstractKeyring).to.be.true
+    expect(data instanceof SingleKeyring || data instanceof MultipleKeyring || data instanceof RoleBasedKeyring).to.be.true
     const objectKeys = ['_address']
 
     if (data instanceof SingleKeyring) {
@@ -789,6 +789,7 @@ describe('caver.wallet.keyring.decrypt', () => {
             const result = caver.wallet.keyring.decrypt(keystoreJsonV3, password)
 
             validateKeyring(result, { keys: expectedAccount.keys, address: expectedAccount.address })
+            expect(keystoreJsonV3.crypto).not.to.be.undefined
         })
     })
 })
@@ -833,6 +834,51 @@ describe('keyring.getPublicKey', () => {
             expect(pubKey[1][1]).to.equal(keyring.keys[1][1].getPublicKey())
             expect(pubKey[1][2]).to.equal(keyring.keys[1][2].getPublicKey())
             expect(pubKey[2][0]).to.equal(keyring.keys[2][0].getPublicKey())
+            expect(pubKey[0].length).to.equal(2)
+            expect(pubKey[1].length).to.equal(3)
+            expect(pubKey[2].length).to.equal(1)
+        })
+    })
+
+    context('CAVERJS-UNIT-KEYRING-166: keyring type: coupled, compressed: true', () => {
+        it('return single public key with roled form', () => {
+            const keyring = caver.wallet.keyring.generate()
+            const pubKey = keyring.getPublicKey(true)
+
+            expect(pubKey).to.equal(keyring.key.getPublicKey(true))
+        })
+    })
+
+    context('CAVERJS-UNIT-KEYRING-167: keyring type: decoupled, compressed: true', () => {
+        it('return single public key with roled form', () => {
+            const keyring = generateDecoupledKeyring()
+            const pubKey = keyring.getPublicKey(true)
+
+            expect(pubKey).to.equal(keyring.key.getPublicKey(true))
+        })
+    })
+
+    context('CAVERJS-UNIT-KEYRING-168: keyring type: multiple keys, compressed: true', () => {
+        it('return multiple public keys with roled form', () => {
+            const keyring = generateMultiSigKeyring(2)
+            const pubKey = keyring.getPublicKey(true)
+
+            expect(pubKey[0]).to.equal(keyring.keys[0].getPublicKey(true))
+            expect(pubKey[1]).to.equal(keyring.keys[1].getPublicKey(true))
+        })
+    })
+
+    context('CAVERJS-UNIT-KEYRING-169: keyring type: role based keys, compressed: true', () => {
+        it('return role based public keys with roled form', () => {
+            const keyring = generateRoleBasedKeyring([2, 3, 1])
+            const pubKey = keyring.getPublicKey(true)
+
+            expect(pubKey[0][0]).to.equal(keyring.keys[0][0].getPublicKey(true))
+            expect(pubKey[0][1]).to.equal(keyring.keys[0][1].getPublicKey(true))
+            expect(pubKey[1][0]).to.equal(keyring.keys[1][0].getPublicKey(true))
+            expect(pubKey[1][1]).to.equal(keyring.keys[1][1].getPublicKey(true))
+            expect(pubKey[1][2]).to.equal(keyring.keys[1][2].getPublicKey(true))
+            expect(pubKey[2][0]).to.equal(keyring.keys[2][0].getPublicKey(true))
             expect(pubKey[0].length).to.equal(2)
             expect(pubKey[1].length).to.equal(3)
             expect(pubKey[2].length).to.equal(1)
@@ -1414,7 +1460,7 @@ describe('keyring.getKlaytnWalletKey', () => {
 
     context('CAVERJS-UNIT-KEYRING-110: keyring type: multiSig', () => {
         it('should throw error when keyring has multiple keys', () => {
-            const expectedError = `The keyring cannot be exported in KlaytnWalletKey format. Use keyring.encrypt.`
+            const expectedError = `Not supported for this class.`
 
             expect(() => multiSig.getKlaytnWalletKey()).to.throw(expectedError)
         })
@@ -1422,7 +1468,7 @@ describe('keyring.getKlaytnWalletKey', () => {
 
     context('CAVERJS-UNIT-KEYRING-111: keyring type: roleBased', () => {
         it('should throw error when keyring has multiple keys', () => {
-            const expectedError = `The keyring cannot be exported in KlaytnWalletKey format. Use keyring.encrypt.`
+            const expectedError = `Not supported for this class.`
 
             expect(() => roleBased.getKlaytnWalletKey()).to.throw(expectedError)
         })
@@ -1686,7 +1732,7 @@ describe('keyring.encryptV3', () => {
     context('CAVERJS-UNIT-KEYRING-135: keyring type: multiSig, input: password', () => {
         it('should throw error when keyring use multiple private key', () => {
             const password = 'password'
-            const expectedError = `This keyring cannot be encrypted keystore v3. use 'keyring.encrypt(password)'.`
+            const expectedError = `Not supported for this class. Use 'keyring.encrypt(password)'.`
             expect(() => multiSig.encryptV3(password)).to.throw(expectedError)
         })
     })
@@ -1694,7 +1740,7 @@ describe('keyring.encryptV3', () => {
     context('CAVERJS-UNIT-KEYRING-136: keyring type: roleBased, input: password', () => {
         it('should throw error when keyring use different private keys by roles', () => {
             const password = 'password'
-            const expectedError = `This keyring cannot be encrypted keystore v3. use 'keyring.encrypt(password)'.`
+            const expectedError = `Not supported for this class. Use 'keyring.encrypt(password)'.`
             expect(() => roleBased.encryptV3(password)).to.throw(expectedError)
         })
     })

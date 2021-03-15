@@ -24,7 +24,9 @@ const TransactionHasher = require('../transactionHasher/transactionHasher')
 const AbstractTransaction = require('./abstractTransaction')
 const { refineSignatures, typeDetectionFromRLPEncoding } = require('../transactionHelper/transactionHelper')
 const Keyring = require('../../../caver-wallet/src/keyring/keyringFactory')
-const AbstractKeyring = require('../../../caver-wallet/src/keyring/abstractKeyring')
+const SingleKeyring = require('../../../caver-wallet/src/keyring/singleKeyring')
+const MultipleKeyring = require('../../../caver-wallet/src/keyring/multipleKeyring')
+const RoleBasedKeyring = require('../../../caver-wallet/src/keyring/roleBasedKeyring')
 const { KEY_ROLE } = require('../../../caver-wallet/src/keyring/keyringHelper')
 const utils = require('../../../caver-utils/src')
 const SignatureData = require('../../../caver-wallet/src/keyring/signatureData')
@@ -56,8 +58,8 @@ class AbstractFeeDelegatedTransaction extends AbstractTransaction {
     }
 
     set feePayer(f) {
-        if (f === undefined) f = '0x'
-        if (f !== '0x' && !utils.isAddress(f)) throw new Error(`Invalid address of fee payer: ${f}`)
+        if (!f || f === '0x') f = '0x0000000000000000000000000000000000000000'
+        if (!utils.isAddress(f)) throw new Error(`Invalid address of fee payer: ${f}`)
 
         this._feePayer = f.toLowerCase()
     }
@@ -93,12 +95,13 @@ class AbstractFeeDelegatedTransaction extends AbstractTransaction {
         if (_.isString(key)) {
             keyring = Keyring.createFromPrivateKey(key)
         }
-        if (!(keyring instanceof AbstractKeyring))
+        if (!(keyring instanceof SingleKeyring) && !(keyring instanceof MultipleKeyring) && !(keyring instanceof RoleBasedKeyring))
             throw new Error(
                 `Unsupported key type. The key parameter of the signAsFeePayer must be a single private key string, KlaytnWalletKey string, or Keyring instance.`
             )
 
-        if (!this.feePayer || this.feePayer === '0x') this.feePayer = keyring.address
+        if (!this.feePayer || this.feePayer === '0x' || this.feePayer === '0x0000000000000000000000000000000000000000')
+            this.feePayer = keyring.address
         if (this.feePayer.toLowerCase() !== keyring.address.toLowerCase())
             throw new Error(`The feePayer address of the transaction is different with the address of the keyring to use.`)
 
@@ -131,14 +134,14 @@ class AbstractFeeDelegatedTransaction extends AbstractTransaction {
     }
 
     /**
-     * Combines signatures and feePayerSignatures to the transaction from RLP-encoded transaction strings and returns a single transaction with all signatures combined.
+     * Combines RLP-encoded transactions (rawTransaction) to the transaction from RLP-encoded transaction strings and returns a single transaction with all signatures combined.
      * When combining the signatures into a transaction instance,
      * an error is thrown if the decoded transaction contains different value except signatures.
      *
      * @param {Array.<string>} rlpEncodedTxs - An array of RLP-encoded transaction strings.
      * @return {string}
      */
-    combineSignatures(rlpEncodedTxs) {
+    combineSignedRawTransactions(rlpEncodedTxs) {
         if (!_.isArray(rlpEncodedTxs)) throw new Error(`The parameter must be an array of RLP encoded transaction strings.`)
 
         // If the signatures are empty, there may be an undefined member variable.
@@ -157,8 +160,13 @@ class AbstractFeeDelegatedTransaction extends AbstractTransaction {
             for (const k in decoded) {
                 if (k === '_signatures' || k === '_feePayerSignatures') continue
                 if (k === '_feePayer') {
-                    if ((decoded[k] !== '0x' || this[k] === '0x') && fillVariables) this[k] = decoded[k]
-                    if (decoded[k] === '0x') continue
+                    const emtpyAddress = '0x0000000000000000000000000000000000000000'
+                    if (
+                        ((decoded[k] !== '0x' && decoded[k] !== emtpyAddress) || (this[k] === '0x' || this[k] === emtpyAddress)) &&
+                        fillVariables
+                    )
+                        this[k] = decoded[k]
+                    if (decoded[k] === '0x' || decoded[k] === emtpyAddress) continue
                 }
 
                 if (this[k] === undefined && fillVariables) this[k] = decoded[k]

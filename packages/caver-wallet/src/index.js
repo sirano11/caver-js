@@ -18,7 +18,9 @@
 
 const _ = require('lodash')
 const Keyring = require('./keyring/keyringFactory')
-const AbstractKeyring = require('./keyring/abstractKeyring')
+const SingleKeyring = require('./keyring/singleKeyring')
+const MultipleKeyring = require('./keyring/multipleKeyring')
+const RoleBasedKeyring = require('./keyring/roleBasedKeyring')
 const utils = require('../../caver-utils/src')
 
 /**
@@ -89,7 +91,8 @@ class KeyringContainer {
             }
         }
 
-        if (!(keyring instanceof AbstractKeyring)) throw new Error(`Unsupported type value: ${key} (type:${typeof key})`)
+        if (!(keyring instanceof SingleKeyring) && !(keyring instanceof MultipleKeyring) && !(keyring instanceof RoleBasedKeyring))
+            throw new Error(`Unsupported type value: ${key} (type:${typeof key})`)
 
         return this.add(keyring)
     }
@@ -127,6 +130,16 @@ class KeyringContainer {
         const founded = this._addressKeyringMap.get(address.toLowerCase())
 
         return founded
+    }
+
+    /**
+     * Returns whether the keyring corresponding to the address exists
+     *
+     * @param {string} address The address of keyring to check existence.
+     * @return {Keyring}
+     */
+    isExisted(address) {
+        return this.getKeyring(address) !== undefined
     }
 
     /**

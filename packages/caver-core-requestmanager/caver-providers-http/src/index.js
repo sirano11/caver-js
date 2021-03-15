@@ -62,6 +62,9 @@ HttpProvider.prototype._prepareRequest = function() {
         })
     }
 
+    // Set https default port
+    if (request._url.port === null && this.host.slice(0, 5) === 'https') request._url.port = 443
+
     return request
 }
 
@@ -103,8 +106,12 @@ HttpProvider.prototype.send = function(payload, callback) {
                 try {
                     result = JSON.parse(result)
                 } catch (e) {
-                    console.error(`Invalid JSON RPC response: ${JSON.stringify(request.responseText)}`)
-                    error = errors.InvalidResponse(request.responseText)
+                    if (request.responseText === '') {
+                        error = errors.RequestFailed(request.statusText)
+                    } else {
+                        console.error(`Invalid JSON RPC response: ${JSON.stringify(request.responseText)}`)
+                        error = errors.InvalidResponse(request.responseText)
+                    }
                 }
             }
 

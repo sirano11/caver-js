@@ -91,6 +91,12 @@ const Contract = function Contract(jsonInterface, address, options) {
         }
     }
 
+    Object.defineProperty(this, 'defaultSendOptions', {
+        get() {
+            return _this.options
+        },
+    })
+
     // set address
     Object.defineProperty(this.options, 'address', {
         set(value) {
@@ -280,13 +286,22 @@ Contract.setProvider = function(provider, accounts) {
 
 /**
  * Set _keyrings in contract instance.
- * When _keyrings is exsit, contract will use _keyrings instead of _klayAccounts
  *
  * @param {KeyringContainer} keyrings
  */
 Contract.prototype.setKeyrings = function(keyrings) {
     if (!(keyrings instanceof KeyringContainer)) throw new Error(`keyrings should be an instance of 'KeyringContainer'`)
     this._keyrings = keyrings
+}
+
+/**
+ * Set _wallet in contract instance.
+ * When _wallet exists, contract will use _wallet instead of _klayAccounts
+ *
+ * @param {IWallet} wallet
+ */
+Contract.prototype.setWallet = function(wallet) {
+    this._wallet = wallet
 }
 
 Contract.prototype.addAccounts = function(accounts) {
@@ -586,12 +601,10 @@ Contract.prototype.deploy = function(options, callback) {
 
     // return error, if no "data" is specified
     if (!options.data) {
-        return utils._fireError(
-            new Error('No "data" specified in neither the given options, nor the default options.'),
-            null,
-            null,
-            callback
-        )
+        const error = new Error('No "data" specified in neither the given options, nor the default options.')
+        if (callback) callback(error)
+
+        throw error
     }
 
     const constructor =
@@ -606,7 +619,7 @@ Contract.prototype.deploy = function(options, callback) {
             parent: this,
             deployData: options.data,
             _klayAccounts: this.constructor._klayAccounts,
-            _keyrings: this._keyrings,
+            _wallet: this._wallet,
         },
         options.arguments
     )
@@ -663,7 +676,9 @@ Contract.prototype._generateEventOptions = function() {
  * @return {Object} the event subscription
  */
 Contract.prototype.clone = function(contractAddress = this.options.address) {
-    return new this.constructor(this.options.jsonInterface, contractAddress, this.options)
+    const cloned = new this.constructor(this.options.jsonInterface, contractAddress, this.options)
+    cloned.setWallet(this._wallet)
+    return cloned
 }
 
 /**
@@ -849,19 +864,30 @@ Contract.prototype._createTxObject = function _createTxObject() {
     txObject.send.request = this.parent._executeMethod.bind(txObject, 'send', true) // to make batch requests
     txObject.encodeABI = this.parent._encodeMethodABI.bind(txObject)
     txObject.estimateGas = this.parent._executeMethod.bind(txObject, 'estimate')
-
-    if (args && this.method.inputs && args.length !== this.method.inputs.length) {
-        if (this.nextMethod) {
-            return this.nextMethod.apply(null, args)
-        }
-        throw errors.InvalidNumberOfParams(args.length, this.method.inputs.length, this.method.name)
-    }
-
     txObject.arguments = args || []
     txObject._method = this.method
     txObject._parent = this.parent
+
+    if (args && this.method.inputs) {
+        if (args.length !== this.method.inputs.length) {
+            if (this.nextMethod) {
+                return this.nextMethod.apply(null, args)
+            }
+            throw errors.InvalidNumberOfParams(args.length, this.method.inputs.length, this.method.name)
+        } else if (this.nextMethod) {
+            // If the number of parameters of the function is the same, but the types of parameters are different,
+            // determine whether the function is an appropriate function through encoding operation with the input parameter.
+            // If an encoding error occurs, check by using to the next method.
+            try {
+                txObject.encodeABI(args)
+            } catch (e) {
+                return this.nextMethod.apply(null, args)
+            }
+        }
+    }
+
     txObject._klayAccounts = this.parent.constructor._klayAccounts || this._klayAccounts
-    txObject._keyrings = this.parent._keyrings || this._keyrings
+    txObject._wallet = this.parent._wallet || this._wallet
 
     if (this.deployData) {
         txObject._deployData = this.deployData
@@ -933,12 +959,12 @@ Contract.prototype._processExecuteArguments = function _processExecuteArguments(
  * @param {Boolean} makeRequest if true, it simply returns the request parameters, rather than executing it
  */
 
-Contract.prototype._executeMethod = function _executeMethod() {
+Contract.prototype._executeMethod = async function _executeMethod() {
     const _this = this
     const args = this._parent._processExecuteArguments.call(this, Array.prototype.slice.call(arguments), defer)
     var defer = utils.promiEvent(args.type !== 'send') /* eslint-disable-line no-var */
     const klayAccounts = _this.constructor._klayAccounts || _this._klayAccounts
-    const keyrings = _this._parent._keyrings || _this._keyrings
+    const wallet = _this._parent._wallet || _this._wallet
 
     // Not allow to specify options.gas to 0.
     if (args.options && args.options.gas === 0) {
@@ -1076,10 +1102,13 @@ Contract.prototype._executeMethod = function _executeMethod() {
                 extraFormatters,
             }).createFunction()
 
-            if (keyrings) {
-                const isExisted = keyrings.getKeyring(args.options.from)
+            if (wallet) {
+                const isExisted = await wallet.isExisted(args.options.from)
                 if (!isExisted) {
-                    return sendTransaction(args.options, args.callback)
+                    if (wallet instanceof KeyringContainer) {
+                        return sendTransaction(args.options, args.callback)
+                    }
+                    throw new Error(`Failed to find ${args.options.from}. Please check that the corresponding account or keyring exists.`)
                 }
 
                 const sendRawTransaction = new Method({
@@ -1099,7 +1128,7 @@ Contract.prototype._executeMethod = function _executeMethod() {
                     transaction = new SmartContractExecution(args.options)
                 }
 
-                return keyrings.sign(transaction.from, transaction).then(signedTx => {
+                return wallet.sign(transaction.from, transaction).then(signedTx => {
                     return sendRawTransaction(signedTx.getRLPEncoding())
                 })
             }

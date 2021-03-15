@@ -914,11 +914,31 @@ describe('caver.utils.unitMap', () => {
         expect(result.Mpeb).to.equals('1000000')
         expect(result.Gpeb).to.equals('1000000000')
         expect(result.Ston).to.equals('1000000000')
+        expect(result.ston).to.equals('1000000000')
         expect(result.uKLAY).to.equals('1000000000000')
         expect(result.mKLAY).to.equals('1000000000000000')
         expect(result.KLAY).to.equals('1000000000000000000')
         expect(result.kKLAY).to.equals('1000000000000000000000')
         expect(result.MKLAY).to.equals('1000000000000000000000000')
+        expect(result.GKLAY).to.equals('1000000000000000000000000000')
+        expect(result.TKLAY).to.equals('1000000000000000000000000000000')
+    })
+})
+
+describe('caver.utils.klayUnit', () => {
+    it('CAVERJS-UNIT-ETC-250: should return valid klayUnit', () => {
+        const klayUnit = caver.utils.klayUnit
+        const unitMap = caver.utils.unitMap
+        Object.values(klayUnit).map(unitObj => {
+            const { unit, pebFactor } = unitObj
+            expect(unitMap[unit]).not.to.undefined
+            expect(unitMap[unit]).to.equal(
+                caver.utils
+                    .toBN(10)
+                    .pow(caver.utils.toBN(pebFactor))
+                    .toString(10)
+            )
+        })
     })
 })
 
@@ -1137,11 +1157,14 @@ describe('caver.utils.xyPointFromPublicKey', () => {
             '0x12b97e6756861ac0257a240d985d761cee9ca7719a29c233c644cfcc421885000c8e4c69cdb71665377b9e8ffb702355ca53917e66c7444619049c3dd0252ab6'
         const publicKey4 =
             '0x05b3b58259770871a1cc18534f2d438935fa2dcdb04116cbfbde8adfe858c23e50047c5aea3c2f55de7de04203f8fe8ccc3b491029338d038a7ef6d6903b302e'
+        const publicKey5 =
+            '0x04019b186993b620455077b6bc37bf61666725d8d87ab33eb113ac0414cd48d78ff46e5ea48c6f22e8f19a77e5dbba9d209df60cbcb841b7e3e81fe444ba829831'
 
         const xyPoint1 = caver.utils.xyPointFromPublicKey(publicKey1)
         const xyPoint2 = caver.utils.xyPointFromPublicKey(publicKey2)
         const xyPoint3 = caver.utils.xyPointFromPublicKey(publicKey3)
         const xyPoint4 = caver.utils.xyPointFromPublicKey(publicKey4)
+        const xyPoint5 = caver.utils.xyPointFromPublicKey(publicKey5)
 
         expect(xyPoint1[0]).to.equals('0x46241c7524030e5b44fff78021e35227d708c8630757b35090d56527b615f60')
         expect(xyPoint1[1]).to.equals('0x5b8d366782c86dee49356be574e1172f75ef5ce5d03b6e8c17dbf10f3fa2d9a3')
@@ -1154,6 +1177,9 @@ describe('caver.utils.xyPointFromPublicKey', () => {
 
         expect(xyPoint4[0]).to.equals('0x5b3b58259770871a1cc18534f2d438935fa2dcdb04116cbfbde8adfe858c23e')
         expect(xyPoint4[1]).to.equals('0x50047c5aea3c2f55de7de04203f8fe8ccc3b491029338d038a7ef6d6903b302e')
+
+        expect(xyPoint5[0]).to.equals('0x19b186993b620455077b6bc37bf61666725d8d87ab33eb113ac0414cd48d78f')
+        expect(xyPoint5[1]).to.equals('0xf46e5ea48c6f22e8f19a77e5dbba9d209df60cbcb841b7e3e81fe444ba829831')
     })
 
     it('CAVERJS-UNIT-ETC-209: caver.utils.xyPointFromPublicKey should return x, y point with compressed public key', () => {
@@ -1239,6 +1265,14 @@ describe('caver.utils.isValidPublicKey', () => {
 
         const isValid = caver.utils.isValidPublicKey(pub)
         expect(isValid).to.be.false
+    })
+
+    it('CAVERJS-UNIT-ETC-253: caver.utils.isValidPublicKey should true with 04 uncompressed prefixed public key string', () => {
+        const pub =
+            '0x04019b186993b620455077b6bc37bf61666725d8d87ab33eb113ac0414cd48d78ff46e5ea48c6f22e8f19a77e5dbba9d209df60cbcb841b7e3e81fe444ba829831'
+
+        const isValid = caver.utils.isValidPublicKey(pub)
+        expect(isValid).to.be.true
     })
 })
 

@@ -23,7 +23,9 @@ const Hash = require('eth-lib/lib/hash')
 const TransactionHasher = require('../transactionHasher/transactionHasher')
 const utils = require('../../../caver-utils')
 const Keyring = require('../../../caver-wallet/src/keyring/keyringFactory')
-const AbstractKeyring = require('../../../caver-wallet/src/keyring/abstractKeyring')
+const SingleKeyring = require('../../../caver-wallet/src/keyring/singleKeyring')
+const MultipleKeyring = require('../../../caver-wallet/src/keyring/multipleKeyring')
+const RoleBasedKeyring = require('../../../caver-wallet/src/keyring/roleBasedKeyring')
 const { TX_TYPE_STRING, refineSignatures, typeDetectionFromRLPEncoding } = require('../transactionHelper/transactionHelper')
 const { KEY_ROLE } = require('../../../caver-wallet/src/keyring/keyringHelper')
 const { validateParams } = require('../../../caver-core-helpers/src/validateFunction')
@@ -77,7 +79,10 @@ class AbstractTransaction {
     }
 
     set from(address) {
-        if (this.type === TX_TYPE_STRING.TxTypeLegacyTransaction && address === '0x') {
+        if (
+            this.type === TX_TYPE_STRING.TxTypeLegacyTransaction &&
+            (address === '0x' || address === '0x0000000000000000000000000000000000000000')
+        ) {
             this._from = address.toLowerCase()
         } else {
             if (!utils.isAddress(address)) throw new Error(`Invalid address ${address}`)
@@ -141,6 +146,27 @@ class AbstractTransaction {
     }
 
     /**
+     * Returns the RLP-encoded string of this transaction (i.e., rawTransaction).
+     * This method has to be overrided in classes which extends AbstractTransaction.
+     *
+     * @return {string}
+     */
+    getRLPEncoding() {
+        throw new Error(`Not implemented.`)
+    }
+
+    /**
+     * Returns the RLP-encoded string to make the signature of this transaction.
+     * This method has to be overrided in classes which extends AbstractTransaction.
+     * getCommonRLPEncodingForSignature is used in getRLPEncodingForSignature.
+     *
+     * @return {string}
+     */
+    getCommonRLPEncodingForSignature() {
+        throw new Error(`Not implemented.`)
+    }
+
+    /**
      * Signs to the transaction with private key(s) in the `key`.
      * @async
      * @param {Keyring|string} key - The instance of Keyring, private key string or KlaytnWalletKey string.
@@ -160,7 +186,7 @@ class AbstractTransaction {
         if (_.isString(key)) {
             keyring = Keyring.createFromPrivateKey(key)
         }
-        if (!(keyring instanceof AbstractKeyring))
+        if (!(keyring instanceof SingleKeyring) && !(keyring instanceof MultipleKeyring) && !(keyring instanceof RoleBasedKeyring))
             throw new Error(
                 `Unsupported key type. The key must be a single private key string, KlaytnWalletKey string, or Keyring instance.`
             )
@@ -169,7 +195,7 @@ class AbstractTransaction {
         if (this.type === TX_TYPE_STRING.TxTypeLegacyTransaction && keyring.isDecoupled())
             throw new Error(`A legacy transaction cannot be signed with a decoupled keyring.`)
 
-        if (!this.from || this.from === '0x') this.from = keyring.address
+        if (!this.from || this.from === '0x' || this.from === '0x0000000000000000000000000000000000000000') this.from = keyring.address
         if (this.from.toLowerCase() !== keyring.address.toLowerCase())
             throw new Error(`The from address of the transaction is different with the address of the keyring to use.`)
 
@@ -204,14 +230,14 @@ class AbstractTransaction {
     }
 
     /**
-     * Combines signatures to the transaction from RLP-encoded transaction strings and returns a single transaction with all signatures combined.
+     * Combines RLP-encoded transactions (rawTransaction) to the transaction from RLP-encoded transaction strings and returns a single transaction with all signatures combined.
      * When combining the signatures into a transaction instance,
      * an error is thrown if the decoded transaction contains different value except signatures.
      *
      * @param {Array.<string>} rlpEncodedTxs - An array of RLP-encoded transaction strings.
      * @return {string}
      */
-    combineSignatures(rlpEncodedTxs) {
+    combineSignedRawTransactions(rlpEncodedTxs) {
         if (!_.isArray(rlpEncodedTxs)) throw new Error(`The parameter must be an array of RLP-encoded transaction strings.`)
 
         // If the signatures are empty, there may be an undefined member variable.
@@ -286,18 +312,6 @@ class AbstractTransaction {
             throw new Error(`chainId is undefined. Define chainId in transaction or use 'transaction.fillTransaction' to fill values.`)
 
         return RLP.encode([this.getCommonRLPEncodingForSignature(), Bytes.fromNat(this.chainId), '0x', '0x'])
-    }
-
-    /**
-     * Returns the RLP-encoded string to make the signature of this transaction.
-     * This method has to be overrided in classes which extends AbstractTransaction.
-     * getCommonRLPEncodingForSignature is used in getRLPEncodingForSignature.
-     *
-     * @return {string}
-     */
-    // eslint-disable-next-line class-methods-use-this
-    getCommonRLPEncodingForSignature() {
-        throw new Error('getCommonRLPEncodingForSignature has to be implemented')
     }
 
     /**
